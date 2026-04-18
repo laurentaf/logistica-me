@@ -1,9 +1,9 @@
 # Project Memory - Logistica-ME
 
 ## Environment
-- **Python venv path:** `.venv/Scripts/python.exe`
+- **Python venv path:** `.venv/Scripts/python.exe` (THIS PROJECT ONLY - always use this)
 - **Language:** Python 3.11
-- **Use venv for:** All Python operations in this project
+- **Use venv for:** ALL Python operations in this project (never system python)
 
 ## Project Files
 - **API.py:** Downloads dataset from datamission API (requires .env with API_KEY_DATASET)
@@ -22,7 +22,7 @@
 
 ## Token Usage Tracking
 - **Requirement:** Always track token usage per session/conversation
-- **Method:** I (Claude) should report tokens used after significant operations
+- **Method:** I (Claude) should report tokens used after every operations in a file 'tokens.md'
 - **Note:** Two datasets exist: `dataset.parquet` (10k rows) and `dataset_b388...parquet` (1k rows) - different data
 
 ## Project Notes

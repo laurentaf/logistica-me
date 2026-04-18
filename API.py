@@ -14,7 +14,7 @@ response = requests.get(url, headers=headers)
 response.raise_for_status()
 
 # Salva o arquivo localmente
-with open(f"dataset_{project_id}.parquet", "wb") as file:
+with open(f"dataset_{project_id}_2.parquet", "wb") as file:
     file.write(response.content)
 
 print("Download concluído com sucesso!")
