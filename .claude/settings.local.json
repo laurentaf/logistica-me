@@ -12,7 +12,9 @@
       "Bash(pip install *)",
       "Bash(.venv/Scripts/python.exe -m pip install python-dotenv pyarrow pandas -q)",
       "Bash(.venv/Scripts/python.exe -c \"print\\('Venv ready'\\)\")",
-      "Bash(.venv/Scripts/python.exe *)"
+      "Bash(.venv/Scripts/python.exe *)",
+      "Bash(.venv-dbt/Scripts/python.exe *)",
+      "Bash(.venv-dbt/Scripts/dbt.exe init *)"
     ]
   }
 }

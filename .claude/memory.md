@@ -27,3 +27,8 @@
 
 ## Project Notes
 - `.venv` created by user on 2025-04-12 with Python 3.11.9
+
+## dbt Configuration
+- **dbt venv:** `.venv-dbt/Scripts/dbt.exe`
+- **dbt project:** `logistica_dbt/`
+- **Download format:** CSV (5 incremental files: dataset_{project_id}_1.csv to _5.csv)
