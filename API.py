@@ -1,7 +1,11 @@
+import os
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 project_id = "b3884914-82a8-45c9-9c56-f37e87f45077"
-token = API_KEY_DATASET
+token = os.getenv("API_KEY_DATASET")
 url = f"https://api.datamission.com.br/projects/{project_id}/dataset?format=parquet"
 
 headers = {"Authorization": f"Bearer {token}"}
