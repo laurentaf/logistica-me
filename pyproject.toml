@@ -1,0 +1,22 @@
+[project]
+name = "logistica-me"
+version = "0.1.0"
+description = "Projeto de análise de dados logísticos para portfólio"
+authors = [
+    { name = "Laurent Ferreira" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "pandas",
+    "numpy",
+    "python-dotenv"
+]
+
+[tool.setuptools]
+packages = ["src"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
