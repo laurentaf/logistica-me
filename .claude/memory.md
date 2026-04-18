@@ -23,7 +23,13 @@
 ## Token Usage Tracking
 - **Requirement:** Always track token usage per session/conversation
 - **Method:** I (Claude) should report tokens used after every operations in a file 'tokens.md'
+- **CRITICAL:** NEVER skip token registration in tokens.md - this is mandatory for every operation
 - **Note:** Two datasets exist: `dataset.parquet` (10k rows) and `dataset_b388...parquet` (1k rows) - different data
+
+## Claude Guidelines (Do's and Don'ts)
+- **DON'T:** Send full database content for evaluation online
+- **DO:** Use quick Python script to extract schema + max 5 sample rows only
+- **Example:** `python -c "import pandas as pd; df = pd.read_csv('file.csv'); print(df.head(5).to_string())"`
 
 ## Project Notes
 - `.venv` created by user on 2025-04-12 with Python 3.11.9
