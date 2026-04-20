@@ -1,0 +1,223 @@
+version: 2
+
+seeds:
+  - name: raw_logs_00001
+    description: Raw log data from dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00001.csv
+    config:
+      schema: raw
+      tags: ['seed', 'csv', 'seq_00001']
+    columns:
+      - name: log_id
+        description: Unique identifier for each log entry
+      - name: timestamp
+        description: Event timestamp in ISO 8601 format
+      - name: ip_address
+        description: Client IP address
+      - name: http_method
+        description: HTTP method
+      - name: endpoint
+        description: API endpoint path
+      - name: status_code
+        description: HTTP status code
+      - name: response_time_ms
+        description: Response time in milliseconds
+      - name: user_agent
+        description: Client user agent string
+  - name: raw_logs_00002
+    description: Raw log data from dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00002.csv
+    config:
+      schema: raw
+      tags: ['seed', 'csv', 'seq_00002']
+    columns:
+      - name: log_id
+        description: Unique identifier for each log entry
+      - name: timestamp
+        description: Event timestamp in ISO 8601 format
+      - name: ip_address
+        description: Client IP address
+      - name: http_method
+        description: HTTP method
+      - name: endpoint
+        description: API endpoint path
+      - name: status_code
+        description: HTTP status code
+      - name: response_time_ms
+        description: Response time in milliseconds
+      - name: user_agent
+        description: Client user agent string
+  - name: raw_logs_00003
+    description: Raw log data from dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00003.csv
+    config:
+      schema: raw
+      tags: ['seed', 'csv', 'seq_00003']
+    columns:
+      - name: log_id
+        description: Unique identifier for each log entry
+      - name: timestamp
+        description: Event timestamp in ISO 8601 format
+      - name: ip_address
+        description: Client IP address
+      - name: http_method
+        description: HTTP method
+      - name: endpoint
+        description: API endpoint path
+      - name: status_code
+        description: HTTP status code
+      - name: response_time_ms
+        description: Response time in milliseconds
+      - name: user_agent
+        description: Client user agent string
+  - name: raw_logs_00004
+    description: Raw log data from dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00004.csv
+    config:
+      schema: raw
+      tags: ['seed', 'csv', 'seq_00004']
+    columns:
+      - name: log_id
+        description: Unique identifier for each log entry
+      - name: timestamp
+        description: Event timestamp in ISO 8601 format
+      - name: ip_address
+        description: Client IP address
+      - name: http_method
+        description: HTTP method
+      - name: endpoint
+        description: API endpoint path
+      - name: status_code
+        description: HTTP status code
+      - name: response_time_ms
+        description: Response time in milliseconds
+      - name: user_agent
+        description: Client user agent string
+  - name: raw_logs_00005
+    description: Raw log data from dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00005.csv
+    config:
+      schema: raw
+      tags: ['seed', 'csv', 'seq_00005']
+    columns:
+      - name: log_id
+        description: Unique identifier for each log entry
+      - name: timestamp
+        description: Event timestamp in ISO 8601 format
+      - name: ip_address
+        description: Client IP address
+      - name: http_method
+        description: HTTP method
+      - name: endpoint
+        description: API endpoint path
+      - name: status_code
+        description: HTTP status code
+      - name: response_time_ms
+        description: Response time in milliseconds
+      - name: user_agent
+        description: Client user agent string
+  - name: raw_logs_00006
+    description: Raw log data from dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00006.csv
+    config:
+      schema: raw
+      tags: ['seed', 'csv', 'seq_00006']
+    columns:
+      - name: log_id
+        description: Unique identifier for each log entry
+      - name: timestamp
+        description: Event timestamp in ISO 8601 format
+      - name: ip_address
+        description: Client IP address
+      - name: http_method
+        description: HTTP method
+      - name: endpoint
+        description: API endpoint path
+      - name: status_code
+        description: HTTP status code
+      - name: response_time_ms
+        description: Response time in milliseconds
+      - name: user_agent
+        description: Client user agent string
+  - name: raw_logs_00007
+    description: Raw log data from dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00007.csv
+    config:
+      schema: raw
+      tags: ['seed', 'csv', 'seq_00007']
+    columns:
+      - name: log_id
+        description: Unique identifier for each log entry
+      - name: timestamp
+        description: Event timestamp in ISO 8601 format
+      - name: ip_address
+        description: Client IP address
+      - name: http_method
+        description: HTTP method
+      - name: endpoint
+        description: API endpoint path
+      - name: status_code
+        description: HTTP status code
+      - name: response_time_ms
+        description: Response time in milliseconds
+      - name: user_agent
+        description: Client user agent string
+  - name: raw_logs_00008
+    description: Raw log data from dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00008.csv
+    config:
+      schema: raw
+      tags: ['seed', 'csv', 'seq_00008']
+    columns:
+      - name: log_id
+        description: Unique identifier for each log entry
+      - name: timestamp
+        description: Event timestamp in ISO 8601 format
+      - name: ip_address
+        description: Client IP address
+      - name: http_method
+        description: HTTP method
+      - name: endpoint
+        description: API endpoint path
+      - name: status_code
+        description: HTTP status code
+      - name: response_time_ms
+        description: Response time in milliseconds
+      - name: user_agent
+        description: Client user agent string
+  - name: raw_logs_00009
+    description: Raw log data from dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00009.csv
+    config:
+      schema: raw
+      tags: ['seed', 'csv', 'seq_00009']
+    columns:
+      - name: log_id
+        description: Unique identifier for each log entry
+      - name: timestamp
+        description: Event timestamp in ISO 8601 format
+      - name: ip_address
+        description: Client IP address
+      - name: http_method
+        description: HTTP method
+      - name: endpoint
+        description: API endpoint path
+      - name: status_code
+        description: HTTP status code
+      - name: response_time_ms
+        description: Response time in milliseconds
+      - name: user_agent
+        description: Client user agent string
+  - name: raw_logs_00010
+    description: Raw log data from dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00010.csv
+    config:
+      schema: raw
+      tags: ['seed', 'csv', 'seq_00010']
+    columns:
+      - name: log_id
+        description: Unique identifier for each log entry
+      - name: timestamp
+        description: Event timestamp in ISO 8601 format
+      - name: ip_address
+        description: Client IP address
+      - name: http_method
+        description: HTTP method
+      - name: endpoint
+        description: API endpoint path
+      - name: status_code
+        description: HTTP status code
+      - name: response_time_ms
+        description: Response time in milliseconds
+      - name: user_agent
+        description: Client user agent string

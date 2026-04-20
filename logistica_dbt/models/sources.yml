@@ -1,0 +1,41 @@
+version: 2
+
+sources:
+  - name: raw_data
+    database: raw
+    schema: public
+    tables:
+      - name: raw_logs
+        description: "Raw log data from CSV files"
+        columns:
+          - name: log_id
+            description: "Unique identifier for each log entry"
+            tests:
+              - not_null
+              - unique
+          - name: timestamp
+            description: "Event timestamp in ISO 8601 format"
+            tests:
+              - not_null
+          - name: ip_address
+            description: "Client IP address"
+          - name: http_method
+            description: "HTTP method (GET, POST, PUT, DELETE, etc.)"
+            tests:
+              - accepted_values:
+                  values: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']
+          - name: endpoint
+            description: "API endpoint path"
+          - name: status_code
+            description: "HTTP status code"
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['100', '200', '201', '204', '400', '401', '403', '404', '500', '502', '503']
+          - name: response_time_ms
+            description: "Response time in milliseconds"
+            tests:
+              - not_null
+              - positive_value
+          - name: user_agent
+            description: "Client user agent string"

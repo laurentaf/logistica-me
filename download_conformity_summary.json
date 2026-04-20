@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-04-20T01:45:47.787523",
+  "total_files_tested": 5,
+  "total_tests": 25,
+  "total_passed": 25,
+  "total_failed": 0,
+  "overall_conformity_percentage": 100.0,
+  "files": [
+    {
+      "file": "dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00001.csv",
+      "conformity": 100.0
+    },
+    {
+      "file": "dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00002.csv",
+      "conformity": 100.0
+    },
+    {
+      "file": "dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00003.csv",
+      "conformity": 100.0
+    },
+    {
+      "file": "dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00004.csv",
+      "conformity": 100.0
+    },
+    {
+      "file": "dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00005.csv",
+      "conformity": 100.0
+    }
+  ]
+}

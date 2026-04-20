@@ -1,0 +1,44 @@
+# dbt seed configuration for processed data
+version: 2
+
+seeds:
+  - name: stg_raw_logs
+    config:
+      schema: raw
+      enabled: true
+      tags: ['seeds']
+      post-hook:
+        - "{{ log('Seed loaded: ' ~ this.identifier ~ ' with ' ~ this.row_count ~ ' rows', info=True) }}"
+    
+    columns:
+      - name: log_id
+        data_type: varchar
+        description: "Unique identifier for each log entry"
+        
+      - name: timestamp
+        data_type: timestamp
+        description: "Event timestamp"
+        
+      - name: ip_address
+        data_type: varchar
+        description: "Client IP address"
+        
+      - name: http_method
+        data_type: varchar
+        description: "HTTP method"
+        
+      - name: endpoint
+        data_type: varchar
+        description: "API endpoint path"
+        
+      - name: status_code
+        data_type: integer
+        description: "HTTP status code"
+        
+      - name: response_time_ms
+        data_type: integer
+        description: "Response time in milliseconds"
+        
+      - name: user_agent
+        data_type: text
+        description: "Client user agent string"

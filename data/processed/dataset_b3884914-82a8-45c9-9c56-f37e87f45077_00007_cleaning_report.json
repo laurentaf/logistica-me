@@ -1,0 +1,13 @@
+{
+  "raw_file": "data/raw/dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00007.csv",
+  "processed_file": "data/processed/dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00007_processed.csv",
+  "processing_timestamp": "2026-04-20T12:46:28.266621",
+  "cleaning_stats": {
+    "rows_processed": 1000,
+    "rows_cleaned": 1000,
+    "columns_processed": 8,
+    "timestamp_fixes": 1000,
+    "ip_fixes": 0,
+    "response_time_fixes": 1000
+  }
+}

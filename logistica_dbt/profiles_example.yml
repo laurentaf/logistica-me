@@ -1,0 +1,32 @@
+# PostgreSQL Configuration Example for dbt
+# Copy this file to ~/.dbt/profiles.yml and update credentials
+
+logistica_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost           # PostgreSQL host
+      user: postgres            # PostgreSQL username
+      pass: your_password_here  # PostgreSQL password
+      port: 5432                # PostgreSQL port (default: 5432)
+      dbname: logistica_db      # Database name
+      schema: raw               # Default schema for seeds
+      threads: 4                # Number of concurrent threads
+      keepalives_idle: 0        # Keep connection alive
+      sslmode: prefer           # SSL mode (prefer/require/disable)
+    
+    prod:
+      type: postgres
+      host: production-db.example.com
+      user: prod_user
+      pass: ${DB_PASSWORD}      # Use environment variable for security
+      port: 5432
+      dbname: logistica_prod
+      schema: analytics
+      threads: 8
+      sslmode: require
+
+# Usage:
+# dbt seed --target dev      # Load data to development database
+# dbt run --target prod      # Run transformations on production
