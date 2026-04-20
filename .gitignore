@@ -1,6 +1,5 @@
 .venv/
 .venv-dbt/
-dataset*.csv
 logs/
 .env
 .env.local

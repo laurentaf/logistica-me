@@ -130,13 +130,15 @@ API (download) → data/raw → Limpeza → data/processed → dbt seed → Post
    - Cada execução gera novos arquivos
    - Executa testes básicos de consistência
 
-2. **`data_consistency_tests.py`** - Testes de qualidade
+2. **`API.py`** - Testes de qualidade integrados
    ```bash
-   python data_consistency_tests.py
+   python API.py
    ```
+   - Baixa dados da API para `data/raw/`
+   - Cada execução gera novos arquivos
+   - Executa testes básicos de consistência
    - Valida estrutura de todos os arquivos CSV
    - Verifica conformidade com schema esperado
-   - Gera relatório de conformidade
 
 3. **`data_processing_pipeline.py`** - Pipeline completo
    ```bash
@@ -179,8 +181,7 @@ docker-compose up -d
 # 1. Baixar novos dados da API (só novos arquivos)
 python API.py
 
-# 2. Rodar testes de consistência (só novos arquivos)
-python data_consistency_tests.py
+# 2. Testes de consistência já integrados no passo 1
 
 # 3. Processar e limpar dados (só novos arquivos)
 python data_processing_pipeline.py
