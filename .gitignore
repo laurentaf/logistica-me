@@ -16,3 +16,4 @@ config.yaml
 config.yml
 config.json
 .secrets
+config/seed_state.json

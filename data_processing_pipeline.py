@@ -9,15 +9,15 @@ Steps:
 """
 
 import os
-import csv
 import json
 from datetime import datetime
 import shutil
 from pathlib import Path
+import pandas as pd
 
 def clean_and_process_csv(raw_file, processed_dir="data/processed"):
     """
-    Clean CSV file and save to processed directory.
+    Clean CSV file using pandas and save to processed directory.
     
     Args:
         raw_file: Path to raw CSV file
@@ -34,97 +34,121 @@ def clean_and_process_csv(raw_file, processed_dir="data/processed"):
     
     print(f"🔧 Processing: {raw_file} → {processed_path}")
     
-    # Data cleaning operations
+    # Read CSV with pandas
+    try:
+        df = pd.read_csv(raw_file, dtype=str)  # Read everything as string first
+    except Exception as e:
+        print(f"❌ Error reading {raw_file}: {e}")
+        return None
+    
+    original_rows = len(df)
     cleaning_stats = {
-        "rows_processed": 0,
-        "rows_cleaned": 0,
-        "columns_processed": 8,  # Expected columns
+        "rows_processed": original_rows,
+        "rows_cleaned": original_rows,
+        "columns_processed": len(df.columns),
         "timestamp_fixes": 0,
         "ip_fixes": 0,
-        "response_time_fixes": 0
+        "response_time_fixes": 0,
+        "status_code_fixes": 0
     }
     
-    try:
-        with open(raw_file, 'r', encoding='utf-8') as infile, \
-             open(processed_path, 'w', encoding='utf-8', newline='') as outfile:
-            
-            reader = csv.DictReader(infile)
-            fieldnames = reader.fieldnames
-            
-            if fieldnames is None:
-                raise ValueError(f"Empty CSV file: {raw_file}")
-            
-            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            for row_num, row in enumerate(reader, 1):
-                cleaning_stats["rows_processed"] += 1
-                
-                # Clean timestamp: ensure ISO format
-                if 'timestamp' in row and row['timestamp']:
-                    try:
-                        # Try to parse and standardize timestamp
-                        dt = datetime.fromisoformat(row['timestamp'].replace('Z', '+00:00'))
-                        row['timestamp'] = dt.isoformat()
-                        cleaning_stats["timestamp_fixes"] += 1
-                    except (ValueError, TypeError):
-                        pass  # Keep original if can't parse
-                
-                # Clean response_time_ms: ensure integer
-                if 'response_time_ms' in row and row['response_time_ms']:
-                    try:
-                        row['response_time_ms'] = int(float(row['response_time_ms']))
-                        cleaning_stats["response_time_fixes"] += 1
-                    except (ValueError, TypeError):
-                        pass
-                
-                # Clean status_code: ensure integer
-                if 'status_code' in row and row['status_code']:
-                    try:
-                        row['status_code'] = int(row['status_code'])
-                    except (ValueError, TypeError):
-                        pass
-                
-                # Clean IP address: basic validation
-                if 'ip_address' in row and row['ip_address']:
-                    ip = row['ip_address'].strip()
-                    # Simple IPv4 validation
-                    if '.' in ip and len(ip.split('.')) == 4:
-                        row['ip_address'] = ip
-                    else:
-                        cleaning_stats["ip_fixes"] += 1
-                
-                writer.writerow(row)
-                cleaning_stats["rows_cleaned"] += 1
-        
-        print(f"✅ Processed {cleaning_stats['rows_cleaned']} rows")
-        print(f"   Timestamp fixes: {cleaning_stats['timestamp_fixes']}")
-        print(f"   IP fixes: {cleaning_stats['ip_fixes']}")
-        print(f"   Response time fixes: {cleaning_stats['response_time_fixes']}")
-        
-        # Save cleaning report
-        report_path = Path(processed_dir) / raw_path.name.replace(".csv", "_cleaning_report.json")
-        with open(report_path, 'w', encoding='utf-8') as report_file:
-            json.dump({
-                "raw_file": str(raw_file),
-                "processed_file": str(processed_path),
-                "processing_timestamp": datetime.now().isoformat(),
-                "cleaning_stats": cleaning_stats
-            }, report_file, indent=2)
-        
-        return str(processed_path)
-        
-    except Exception as e:
-        print(f"❌ Error processing {raw_file}: {e}")
-        return None
+    # Clean timestamp: ensure ISO format
+    if 'timestamp' in df.columns:
+        before = df['timestamp'].copy()
+        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce', utc=True).dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
+        # Restore NaT (parsing failures) to original
+        mask = df['timestamp'].isna()
+        df.loc[mask, 'timestamp'] = before[mask]
+        cleaning_stats["timestamp_fixes"] = (df['timestamp'] != before).sum()
+    
+    # Clean response_time_ms: ensure integer
+    if 'response_time_ms' in df.columns:
+        before = df['response_time_ms'].copy()
+        # Convert to numeric, errors='coerce' turns invalid values into NaN
+        df['response_time_ms'] = pd.to_numeric(df['response_time_ms'], errors='coerce')
+        # Round to integer (floor) and fill NaN with original where conversion failed
+        df['response_time_ms'] = df['response_time_ms'].apply(
+            lambda x: int(x) if pd.notna(x) else None
+        )
+        # Count how many were successfully converted to int
+        cleaning_stats["response_time_fixes"] = df['response_time_ms'].notna().sum() - before.notna().sum()
+    
+    # Clean status_code: ensure integer
+    if 'status_code' in df.columns:
+        before = df['status_code'].copy()
+        df['status_code'] = pd.to_numeric(df['status_code'], errors='coerce')
+        df['status_code'] = df['status_code'].apply(
+            lambda x: int(x) if pd.notna(x) else None
+        )
+        cleaning_stats["status_code_fixes"] = df['status_code'].notna().sum() - before.notna().sum()
+    
+    # Clean IP address: basic validation (keep simple IPv4 pattern)
+    if 'ip_address' in df.columns:
+        before = df['ip_address'].copy()
+        # Simple IPv4 pattern: 4 octets of 0-255 separated by dots
+        ipv4_pattern = r'^\d{1,3}(\.\d{1,3}){3}$'
+        df['ip_address'] = df['ip_address'].where(
+            df['ip_address'].str.match(ipv4_pattern, na=False),
+            before
+        )
+        cleaning_stats["ip_fixes"] = (df['ip_address'] != before).sum()
+    
+    # Write processed CSV (use index=False to avoid extra column)
+    df.to_csv(processed_path, index=False)
+    
+    print(f"✅ Processed {cleaning_stats['rows_cleaned']} rows")
+    print(f"   Timestamp fixes: {cleaning_stats['timestamp_fixes']}")
+    print(f"   IP fixes: {cleaning_stats['ip_fixes']}")
+    print(f"   Response time fixes: {cleaning_stats['response_time_fixes']}")
+    print(f"   Status code fixes: {cleaning_stats['status_code_fixes']}")
+    
+    # Save cleaning report
+    report_path = Path(processed_dir) / raw_path.name.replace(".csv", "_cleaning_report.json")
+    with open(report_path, 'w', encoding='utf-8') as report_file:
+        json.dump({
+            "raw_file": str(raw_file),
+            "processed_file": str(processed_path),
+            "processing_timestamp": datetime.now().isoformat(),
+            "cleaning_stats": cleaning_stats
+        }, report_file, indent=2)
+    
+    return str(processed_path)
 
-# NOTE: Seeding is now handled exclusively by incremental_dbt_seed.py.
-# This function is deprecated to avoid duplicate file copying and state conflicts.
 def prepare_dbt_seeds(processed_dir="data/processed", seeds_dir="logistica_dbt/seeds"):
     """
-    Deprecated: Use incremental_dbt_seed.py instead.
+    Prepare processed files for dbt seed command.
+    Only prepares files that haven't been seeded before (incremental).
+    
+    Args:
+        processed_dir: Directory with processed CSV files
+        seeds_dir: dbt seeds directory
+        
+    Returns:
+        List of seed files prepared
     """
-    raise RuntimeError("prepare_dbt_seeds is deprecated. Run incremental_dbt_seed.py to load data to PostgreSQL.")
+    os.makedirs(seeds_dir, exist_ok=True)
+    
+    # Find all processed CSV files
+    processed_files = list(Path(processed_dir).glob("*_processed.csv"))
+    
+    print(f"🌱 Preparing {len(processed_files)} files for dbt seed (copy only)...")
+    
+    seed_files = []
+    for processed_file in processed_files:
+        seed_name = processed_file.stem.replace("_processed", "")
+        seed_path = Path(seeds_dir) / processed_file.name.replace("_processed", "")
+        
+        try:
+            # Copy processed file to seeds directory
+            shutil.copy2(processed_file, seed_path)
+            seed_files.append(str(seed_path))
+            
+            print(f"✅ Prepared seed: {seed_path.name}")
+            
+        except Exception as e:
+            print(f"❌ Error preparing seed {processed_file.name}: {e}")
+    
+    return seed_files
 
 def run_full_pipeline():
     """Run complete data processing pipeline."""
@@ -155,14 +179,18 @@ def run_full_pipeline():
     
     print(f"✅ Successfully processed {len(processed_files)} files")
     
+    # Step 3: Prepare for dbt seed (Just copy; incremental_dbt_seed.py manages incremental load)
+    seed_files = prepare_dbt_seeds()
+    
     print("\n" + "=" * 60)
     print("🎉 PIPELINE COMPLETED SUCCESSFULLY")
     print("=" * 60)
     print(f"📊 Summary:")
     print(f"   Raw files: {len(raw_files)}")
     print(f"   Processed files: {len(processed_files)}")
+    print(f"   Seed files prepared: {len(seed_files)}")
     print("\n📋 Next steps:")
-    print("   1. Run incremental_dbt_seed.py to load new data to PostgreSQL")
+    print("   1. Run incremental dbt seed to load new data to PostgreSQL")
     print("      python3 incremental_dbt_seed.py")
     print("   2. Run dbt models")
     print("      cd logistica_dbt && dbt run")

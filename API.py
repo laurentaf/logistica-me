@@ -1,5 +1,6 @@
 import os
 import argparse
+import csv
 import requests
 import subprocess
 import json
@@ -294,7 +295,35 @@ if __name__ == "__main__":
         with open(filepath, "wb") as file:
             file.write(response.content)
 
-        print(f"✅ Download {i-start_seq+1}/{args.count} concluído: {filepath}")
+        # Collect metadata immediately after download
+        file_size = os.path.getsize(filepath)
+        row_count = 0
+        column_count = 0
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                headers = next(reader)
+                column_count = len(headers)
+                row_count = sum(1 for _ in reader)
+        except Exception:
+            pass  # If reading fails, keep counts zero; test will catch it
+
+        metadata = {
+            "filename": filename,
+            "filepath": filepath,
+            "download_timestamp": datetime.now().isoformat(),
+            "file_size_bytes": file_size,
+            "row_count": row_count,
+            "column_count": column_count,
+            "source_url": url,
+            "project_id": project_id,
+            "sequence": i
+        }
+        metadata_file = filepath.replace('.csv', '_metadata.json')
+        with open(metadata_file, 'w') as f:
+            json.dump(metadata, f, indent=2)
+
+        print(f"✅ Download {i-start_seq+1}/{args.count} concluído: {filepath} ({row_count} rows)")
         
         # Run test immediately after download
         test_result = run_data_test(filepath)
