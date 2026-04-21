@@ -141,12 +141,12 @@ API (download) → data/raw → Limpeza → data/processed → dbt seed → Post
    - Verifica conformidade com schema esperado
 
 3. **`data_processing_pipeline.py`** - Pipeline completo
-   ```bash
-   python data_processing_pipeline.py
-   ```
-   - Limpa dados brutos (timestamps, IPs, tipos)
-   - Salva versão limpa em `data/processed/`
-   - Prepara arquivos para `dbt seed`
+    ```bash
+    python data_processing_pipeline.py
+    ```
+    - Limpa dados brutos (timestamps, IPs, tipos)
+    - Salva versão limpa em `data/processed/`
+    - Não faz seededb (use `incremental_dbt_seed.py`)
 
 4. **`dbt`** - Transformação e carga
    ```bash
@@ -205,9 +205,11 @@ dbt run --model test_results --profiles-dir .
 # Executar pipeline completo incremental
 python incremental_dbt_seed.py
 ```
-- **Só processa arquivos novos** (tracked em `opencode/seed_state.json`)
+- **Carrega apenas arquivos novos** (tracked em `config/seed_state.json`)
 - **Evita reprocessamento** de dados já carregados
 - **Mantém histórico** de arquivos carregados
+- **Renomeia seeds** para `raw_logs_{seq}.csv` automaticamente
+- **Executa dbt seed** apenas para seeds novas
 
 #### Registro de Uso de Tokens
 **Localização**: `.claude/tokens.md`

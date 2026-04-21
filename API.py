@@ -1,8 +1,10 @@
 import os
+import argparse
 import requests
 import subprocess
 import json
 from datetime import datetime
+from pathlib import Path
 
 project_id = "b3884914-82a8-45c9-9c56-f37e87f45077"
 url = f"https://api.datamission.com.br/projects/{project_id}/dataset?format=csv"
@@ -25,6 +27,32 @@ def load_api_token():
     except FileNotFoundError:
         pass
     return None
+
+def get_next_sequence(start=None):
+    """Get next sequence number. If start provided, use it. Otherwise auto-detect from existing files."""
+    if start is not None:
+        return int(start)
+    
+    # Auto-detect: find highest existing sequence number and add 1
+    raw_dir = Path("data/raw")
+    if not raw_dir.exists():
+        return 1
+    
+    pattern = f"dataset_{project_id}_*.csv"
+    existing_files = list(raw_dir.glob(pattern))
+    
+    max_seq = 0
+    for file in existing_files:
+        try:
+            # Extract sequence: dataset_{project_id}_{seq}.csv
+            seq_part = file.stem.split('_')[-1]
+            seq_num = int(seq_part)
+            if seq_num > max_seq:
+                max_seq = seq_num
+        except (ValueError, IndexError):
+            continue
+    
+    return max_seq + 1
 
 def run_data_test(csv_file):
     """Run data consistency test on downloaded CSV file."""
@@ -237,35 +265,43 @@ def log_conformity_summary(test_results_list):
         
         print(f"\n📄 Summary saved to: download_conformity_summary.json")
 
-token = load_api_token()
-if not token:
-    raise ValueError("API_KEY_DATASET not found in .env file")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Download incremental dataset logs")
+    parser.add_argument('--count', type=int, default=5, help='Number of files to download')
+    parser.add_argument('--start', type=int, help='Starting sequence number (default: auto-detect)')
+    args = parser.parse_args()
 
-headers = {"Authorization": f"Bearer {token}"}
+    token = load_api_token()
+    if not token:
+        raise ValueError("API_KEY_DATASET not found in .env file")
 
-test_results = []
+    headers = {"Authorization": f"Bearer {token}"}
 
-# Run 5 times incrementally
-for i in range(1, 6):
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
+    test_results = []
 
-    # Ensure data/raw directory exists
-    os.makedirs("data/raw", exist_ok=True)
-    
-    filename = f"dataset_{project_id}_{i:05d}.csv"
-    filepath = os.path.join("data/raw", filename)
-    with open(filepath, "wb") as file:
-        file.write(response.content)
+    start_seq = get_next_sequence(args.start)
+    print(f"📥 Starting download from sequence {start_seq:05d} ({args.count} files)")
 
-    print(f"✅ Download {i}/5 concluído: {filepath}")
-    
-    # Run test immediately after download
-    test_result = run_data_test(filepath)
-    if test_result:
-        test_results.append(test_result)
+    for i in range(start_seq, start_seq + args.count):
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
 
-print("\n🎉 Todos os downloads concluídos com sucesso!")
+        # Ensure data/raw directory exists
+        os.makedirs("data/raw", exist_ok=True)
+        
+        filename = f"dataset_{project_id}_{i:05d}.csv"
+        filepath = os.path.join("data/raw", filename)
+        with open(filepath, "wb") as file:
+            file.write(response.content)
 
-# Log overall conformity summary
-log_conformity_summary(test_results)
+        print(f"✅ Download {i-start_seq+1}/{args.count} concluído: {filepath}")
+        
+        # Run test immediately after download
+        test_result = run_data_test(filepath)
+        if test_result:
+            test_results.append(test_result)
+
+    print("\n🎉 Todos os downloads concluídos com sucesso!")
+
+    # Log overall conformity summary
+    log_conformity_summary(test_results)

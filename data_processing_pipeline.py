@@ -118,58 +118,13 @@ def clean_and_process_csv(raw_file, processed_dir="data/processed"):
         print(f"❌ Error processing {raw_file}: {e}")
         return None
 
+# NOTE: Seeding is now handled exclusively by incremental_dbt_seed.py.
+# This function is deprecated to avoid duplicate file copying and state conflicts.
 def prepare_dbt_seeds(processed_dir="data/processed", seeds_dir="logistica_dbt/seeds"):
     """
-    Prepare processed files for dbt seed command.
-    Only prepares files that haven't been seeded before (incremental).
-    
-    Args:
-        processed_dir: Directory with processed CSV files
-        seeds_dir: dbt seeds directory
-        
-    Returns:
-        List of seed files prepared
+    Deprecated: Use incremental_dbt_seed.py instead.
     """
-    os.makedirs(seeds_dir, exist_ok=True)
-    
-    # Check seed state to avoid re-processing
-    seed_state_file = "opencode/seed_state.json"
-    processed_before = set()
-    
-    if os.path.exists(seed_state_file):
-        try:
-            with open(seed_state_file, 'r') as f:
-                state = json.load(f)
-                processed_before = set(state.get("processed_files", []))
-        except (json.JSONDecodeError, FileNotFoundError):
-            pass
-    
-    # Find all processed CSV files
-    processed_files = list(Path(processed_dir).glob("*_processed.csv"))
-    
-    # Filter out already processed files
-    new_files = [f for f in processed_files if str(f) not in processed_before]
-    
-    print(f"🌱 Preparing {len(new_files)} new files for dbt seed...")
-    if len(processed_files) - len(new_files) > 0:
-        print(f"   ({len(processed_files) - len(new_files)} files already seeded)")
-    
-    seed_files = []
-    for processed_file in new_files:
-        seed_name = processed_file.stem.replace("_processed", "")
-        seed_path = Path(seeds_dir) / processed_file.name.replace("_processed", "")
-        
-        try:
-            # Copy processed file to seeds directory
-            shutil.copy2(processed_file, seed_path)
-            seed_files.append(str(seed_path))
-            
-            print(f"✅ Prepared seed: {seed_path.name}")
-            
-        except Exception as e:
-            print(f"❌ Error preparing seed {processed_file.name}: {e}")
-    
-    return seed_files
+    raise RuntimeError("prepare_dbt_seeds is deprecated. Run incremental_dbt_seed.py to load data to PostgreSQL.")
 
 def run_full_pipeline():
     """Run complete data processing pipeline."""
@@ -200,21 +155,17 @@ def run_full_pipeline():
     
     print(f"✅ Successfully processed {len(processed_files)} files")
     
-    # Step 3: Prepare for dbt seed
-    seed_files = prepare_dbt_seeds()
-    
     print("\n" + "=" * 60)
     print("🎉 PIPELINE COMPLETED SUCCESSFULLY")
     print("=" * 60)
     print(f"📊 Summary:")
     print(f"   Raw files: {len(raw_files)}")
     print(f"   Processed files: {len(processed_files)}")
-    print(f"   Seed files prepared: {len(seed_files)}")
     print("\n📋 Next steps:")
-    print("   1. Run dbt seed to load data to PostgreSQL")
-    print("      cd logistica_dbt && dbt seed")
+    print("   1. Run incremental_dbt_seed.py to load new data to PostgreSQL")
+    print("      python3 incremental_dbt_seed.py")
     print("   2. Run dbt models")
-    print("      dbt run")
+    print("      cd logistica_dbt && dbt run")
     print("   3. Run data quality tests")
     print("      dbt test")
     print("\n📈 Processed data available in: data/processed/")

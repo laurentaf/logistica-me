@@ -12,7 +12,7 @@ from datetime import datetime
 
 class IncrementalDBTSeed:
     def __init__(self):
-        self.state_file = "opencode/seed_state.json"
+        self.state_file = "config/seed_state.json"
         self.seeds_dir = "logistica_dbt/seeds"
         self.processed_dir = "data/processed"
         self.raw_dir = "data/raw"
@@ -22,7 +22,10 @@ class IncrementalDBTSeed:
         
     def ensure_state_file(self):
         """Ensure state file exists."""
-        os.makedirs("opencode", exist_ok=True)
+        # Ensure the directory for the state file exists
+        state_dir = os.path.dirname(self.state_file)
+        if state_dir:
+            os.makedirs(state_dir, exist_ok=True)
         
         if not os.path.exists(self.state_file):
             state = {
@@ -75,30 +78,44 @@ class IncrementalDBTSeed:
     def prepare_seed_from_processed(self, processed_file):
         """Prepare seed file from processed file."""
         processed_path = Path(processed_file)
-        seed_name = processed_path.stem.replace("_processed", "")
-        seed_path = Path(self.seeds_dir) / processed_path.name.replace("_processed", "")
         
-        # Copy processed file to seeds directory
+        # Extract sequence number from filename:
+        # Example: dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00001_processed.csv
+        stem = processed_path.stem
+        # Remove trailing "_processed" if present
+        if stem.endswith('_processed'):
+            stem = stem[:-10]  # remove "_processed" (10 chars)
+        # Now stem: dataset_b3884914-..._00001
+        # Get last part after final underscore
+        seq = stem.rsplit('_', 1)[-1]
+        if not seq.isdigit():
+            raise ValueError(f"Could not extract sequence from filename: {processed_path.name}")
+        
+        seed_name = f"raw_logs_{seq}"
+        seed_filename = f"{seed_name}.csv"
+        seed_path = Path(self.seeds_dir) / seed_filename
+        
+        # Copy processed file to seeds directory with new name
         import shutil
         shutil.copy2(processed_file, seed_path)
         
-        return str(seed_path), seed_path.name
+        return str(seed_path), seed_name
     
-    def run_dbt_seed(self, seed_files):
-        """Run dbt seed command."""
-        if not seed_files:
-            print("⚠️  No new files to seed")
+    def run_dbt_seed_select(self, seed_names):
+        """Run dbt seed command for specific seeds only."""
+        if not seed_names:
+            print("⚠️  No new seeds to load")
             return True
         
-        print(f"🌱 Running dbt seed for {len(seed_files)} new files...")
+        print(f"🌱 Running dbt seed for {len(seed_names)} new seed(s): {', '.join(seed_names)}")
         
         try:
             # Change to dbt directory
             original_dir = os.getcwd()
             os.chdir("logistica_dbt")
             
-            # Run dbt seed
-            cmd = ["dbt", "seed", "--profiles-dir", "."]
+            # Build command: dbt seed --select seed1 seed2 ...
+            cmd = ["dbt", "seed", "--profiles-dir", "."] + seed_names
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             # Return to original directory
@@ -106,7 +123,8 @@ class IncrementalDBTSeed:
             
             if result.returncode == 0:
                 print("✅ dbt seed completed successfully")
-                print(result.stdout[:500])  # Print first 500 chars of output
+                if result.stdout:
+                    print(result.stdout[:500])
                 return True
             else:
                 print("❌ dbt seed failed")
@@ -140,7 +158,8 @@ class IncrementalDBTSeed:
         print(f"📁 Found {len(new_processed_files)} new processed files")
         
         # Prepare seeds and update state
-        seed_files_prepared = []
+        seed_paths_prepared = []
+        seed_names = []
         total_new_rows = 0
         
         for processed_file in new_processed_files:
@@ -148,7 +167,8 @@ class IncrementalDBTSeed:
                 seed_path, seed_name = self.prepare_seed_from_processed(processed_file)
                 row_count = self.count_rows_in_csv(seed_path)
                 
-                seed_files_prepared.append(seed_path)
+                seed_paths_prepared.append(seed_path)
+                seed_names.append(seed_name)
                 state["processed_files"].append(processed_file)
                 state["loaded_files"].append({
                     "file": seed_name,
@@ -159,13 +179,14 @@ class IncrementalDBTSeed:
                 state["total_rows_loaded"] += row_count
                 
                 print(f"✅ Prepared: {seed_name} ({row_count} rows)")
+                total_new_rows += row_count
                 
             except Exception as e:
                 print(f"❌ Error preparing {processed_file}: {e}")
         
-        # Run dbt seed
-        if seed_files_prepared:
-            success = self.run_dbt_seed(seed_files_prepared)
+        # Run dbt seed for only the new seeds
+        if seed_names:
+            success = self.run_dbt_seed_select(seed_names)
             
             if success:
                 # Update state
@@ -175,7 +196,7 @@ class IncrementalDBTSeed:
                 print("🎉 INCREMENTAL LOAD COMPLETED")
                 print("=" * 60)
                 print(f"📊 Summary:")
-                print(f"   New files loaded: {len(seed_files_prepared)}")
+                print(f"   New files loaded: {len(seed_names)}")
                 print(f"   Total rows added: {total_new_rows}")
                 print(f"   Total files in database: {len(state['loaded_files'])}")
                 print(f"   Total rows in database: {state['total_rows_loaded']}")
