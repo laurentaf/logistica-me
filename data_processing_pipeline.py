@@ -87,11 +87,10 @@ def clean_and_process_csv(raw_file, processed_dir="data/processed"):
         before = df['ip_address'].copy()
         # Simple IPv4 pattern: 4 octets of 0-255 separated by dots
         ipv4_pattern = r'^\d{1,3}(\.\d{1,3}){3}$'
-        df['ip_address'] = df['ip_address'].where(
-            df['ip_address'].str.match(ipv4_pattern, na=False),
-            before
-        )
-        cleaning_stats["ip_fixes"] = (df['ip_address'] != before).sum()
+        valid_mask = df['ip_address'].str.match(ipv4_pattern, na=False)
+        # Replace invalid IPs with None
+        df['ip_address'] = df['ip_address'].where(valid_mask, None)
+        cleaning_stats["ip_fixes"] = (~valid_mask).sum()
     
     # Write processed CSV (use index=False to avoid extra column)
     df.to_csv(processed_path, index=False)

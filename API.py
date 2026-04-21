@@ -4,6 +4,7 @@ import csv
 import requests
 import subprocess
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -202,10 +203,10 @@ for col in test_results["columns"]:
 print(f"\\n📈 CONFORMITY: {{conformity_pct:.1f}}%")
 """
 
-    # Run the test script
+    # Run the test script using the current Python interpreter (cross-platform)
     try:
         result = subprocess.run(
-            ['python3', '-c', test_script],
+            [sys.executable, '-c', test_script],
             capture_output=True,
             text=True,
             check=True
