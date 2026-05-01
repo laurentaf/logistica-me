@@ -1,0 +1,66 @@
+{
+  "test_timestamp": "2026-05-01T09:25:05.198100",
+  "file_name": "data/raw/dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00007.csv",
+  "columns": [],
+  "tests": [
+    {
+      "name": "file_existence",
+      "description": "CSV file exists and is readable",
+      "status": "PASS"
+    },
+    {
+      "name": "readable_csv",
+      "description": "CSV file can be read successfully",
+      "status": "PASS"
+    },
+    {
+      "name": "column_count",
+      "description": "Expected 8 columns, got 8",
+      "status": "PASS",
+      "expected": 8,
+      "actual": 8
+    },
+    {
+      "name": "column_names",
+      "description": "Column names match expected format",
+      "status": "FAIL",
+      "expected": [
+        "log_id",
+        "timestamp",
+        "ip_address",
+        "http_method",
+        "endpoint",
+        "status_code",
+        "response_time_ms",
+        "user_agent"
+      ],
+      "actual": [
+        "shipment_id",
+        "timestamp",
+        "origin",
+        "destination",
+        "weight_kg",
+        "delivery_status",
+        "vehicle_type",
+        "estimated_delay_minutes"
+      ]
+    },
+    {
+      "name": "data_row_count",
+      "description": "Data rows (excluding header): 1000",
+      "status": "PASS",
+      "actual": 1000
+    },
+    {
+      "name": "csv_read_error",
+      "description": "Error reading CSV: 'shipment_id'",
+      "status": "FAIL"
+    }
+  ],
+  "summary": {
+    "total_tests": 6,
+    "passed_tests": 4,
+    "failed_tests": 2,
+    "conformity_percentage": 66.67
+  }
+}

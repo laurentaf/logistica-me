@@ -303,8 +303,8 @@ if __name__ == "__main__":
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 reader = csv.reader(f)
-                headers = next(reader)
-                column_count = len(headers)
+                csv_headers = next(reader)
+                column_count = len(csv_headers)
                 row_count = sum(1 for _ in reader)
         except Exception:
             pass  # If reading fails, keep counts zero; test will catch it
