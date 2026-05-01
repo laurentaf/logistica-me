@@ -2,7 +2,7 @@
 """
 End-to-End Pipeline Test
 Executa todo o fluxo de dados desde a API até os modelos dbt,
-reportando o sucesso/falha de cada etapa.
+reportando o status de cada etapa.
 """
 
 import os
@@ -20,7 +20,20 @@ class colors:
     BOLD = '\033[1m'
     END = '\033[0m'
 
-def run_command(cmd, cwd=None, description=""):
+def get_dbt_path():
+    """Retorna o caminho do dbt do .venv-dbt se existir, senão retorna 'dbt'."""
+    venv_dbt = Path(".venv-dbt")
+    if sys.platform == "win32":
+        dbt_path = venv_dbt / "Scripts" / "dbt.exe"
+        if dbt_path.exists():
+            return [str(dbt_path)]
+    else:
+        dbt_path = venv_dbt / "bin" / "dbt"
+        if dbt_path.exists():
+            return [str(dbt_path)]
+    return ['dbt']  # Fallback to system dbt
+
+def run_command(cmd, cwd=None, description="", check=True):
     """Execute a command and return success status, stdout, stderr."""
     print(f"\n{colors.BLUE}▶ {description}{colors.END}")
     print(f"  Command: {cmd}")
@@ -32,48 +45,66 @@ def run_command(cmd, cwd=None, description=""):
             capture_output=True,
             text=True,
             cwd=cwd,
-            timeout=300  # 5 min timeout
+            timeout=300
         )
         elapsed = time.time() - start
-        if result.returncode == 0:
-            print(f"  {colors.GREEN}✓ SUCCESS{colors.END} ({elapsed:.1f}s)")
-            if result.stdout and len(result.stdout) > 500:
-                print(f"  Output: [truncated - {len(result.stdout)} chars total]")
-            elif result.stdout:
-                print(f"  Output: {result.stdout.strip()}")
-            return True, result.stdout, result.stderr
-        else:
-            print(f"  {colors.RED}✗ FAILED{colors.END} ({elapsed:.1f}s)")
-            print(f"  Error: {result.stderr.strip()}")
+        success = result.returncode == 0
+        status = f"{colors.GREEN}✓ SUCCESS{colors.END}" if success else f"{colors.RED}✗ FAILED{colors.END}"
+        print(f"  {status} ({elapsed:.1f}s)")
+        
+        if result.stdout and len(result.stdout) > 500:
+            print(f"  Output: [truncated - {len(result.stdout)} chars total]")
+        elif result.stdout:
+            print(f"  Output: {result.stdout.strip()}")
+            
+        if result.stderr:
+            print(f"  Stderr: {result.stderr.strip()}")
+            
+        if check and not success:
+            print(f"\n{colors.RED}❌ Command failed with exit code {result.returncode}{colors.END}")
             return False, result.stdout, result.stderr
+            
+        return success, result.stdout, result.stderr
+        
     except subprocess.TimeoutExpired:
+        elapsed = time.time() - start
         print(f"  {colors.RED}✗ TIMEOUT{colors.END} ({elapsed:.1f}s)")
         return False, "", "Command timed out"
     except Exception as e:
+        elapsed = time.time() - start
         print(f"  {colors.RED}✗ ERROR: {e}{colors.END}")
         return False, "", str(e)
 
 def check_dependencies():
     """Check if required tools are installed."""
     print(f"\n{colors.BOLD}🔍 Checking Dependencies{colors.END}")
-    deps = {
-        'python3': 'Python 3 interpreter',
-        'dbt': 'dbt CLI',
-        'psql': 'PostgreSQL client'
-    }
-    missing = []
-    for cmd, desc in deps.items():
-        try:
-            subprocess.run([cmd, '--version'], capture_output=True, timeout=5)
-            print(f"  {colors.GREEN}✓{colors.END} {desc} ({cmd})")
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            print(f"  {colors.RED}✗{colors.END} {desc} ({cmd}) - MISSING")
-            missing.append(cmd)
     
-    if missing:
-        print(f"\n{colors.RED}❌ Missing dependencies: {', '.join(missing)}{colors.END}")
-        print("Install before running pipeline.")
+    # Check Python 3
+    try:
+        result = subprocess.run(['python3', '--version'], capture_output=True, timeout=5)
+        print(f"  {colors.GREEN}✓{colors.END} Python 3 interpreter")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print(f"  {colors.RED}✗{colors.END} Python 3 - MISSING")
         return False
+    
+    # Check dbt (from .venv-dbt or system)
+    dbt_cmd = get_dbt_path()
+    try:
+        # Try without shell to use list directly
+        result = subprocess.run(dbt_cmd + ['--version'], capture_output=True, text=True, timeout=10)
+        print(f"  {colors.GREEN}✓{colors.END} dbt CLI ({' '.join(dbt_cmd)})")
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"  {colors.RED}✗{colors.END} dbt CLI - NOT FOUND")
+        print(f"     {colors.YELLOW}Run: python install_dbt.py{colors.END}")
+        return False
+    
+    # Check psql (optional)
+    try:
+        subprocess.run(['psql', '--version'], capture_output=True, timeout=5)
+        print(f"  {colors.GREEN}✓{colors.END} PostgreSQL client (psql)")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print(f"  {colors.YELLOW}⚠️{colors.END} psql not found (optional for verification)")
+    
     return True
 
 def main():
@@ -138,46 +169,27 @@ def main():
         sys.exit(1)
     
     # Step 4: dbt run (transform models)
+    dbt_cmd = get_dbt_cmd()
     success, stdout, stderr = run_command(
-        "dbt run --profiles-dir .",
+        f"{' '.join(dbt_cmd)} run --profiles-dir .",
         cwd="logistica_dbt",
         description="Step 4: Run dbt models (staging → marts)"
     )
     results.append(("dbt Run", success))
     
-    # Parse output to see which models succeeded
-    if success:
-        # Count lines with "OK" or "PASS"
-        ok_count = stdout.count("OK") + stdout.count("PASS")
-        print(f"  📊 Models executed successfully: {ok_count} references found")
-    else:
-        print(f"  {colors.RED}Some models failed{colors.END}")
-    
     # Step 5: dbt test (quality checks)
     success, stdout, stderr = run_command(
-        "dbt test --profiles-dir .",
+        f"{' '.join(dbt_cmd)} test --profiles-dir .",
         cwd="logistica_dbt",
         description="Step 5: Run dbt tests"
     )
     results.append(("dbt Test", success))
-    
-    # Parse test results summary
-    if success:
-        # Look for pass/fail summary
-        if "PASS" in stdout or "All tests passed" in stdout:
-            test_summary = "✅ Tests passed"
-            print(f"  {test_summary}")
-        else:
-            print(f"  {colors.YELLOW}⚠️  Tests completed but check output for failures{colors.END}")
-    else:
-        print(f"  {colors.RED}Some tests failed{colors.END}")
     
     # Step 6: Verify tables in database
     print(f"\n{colors.BOLD}🔍 Step 6: Verifying database tables{colors.END}")
     try:
         import psycopg2
         from dotenv import load_dotenv
-        import os
         
         load_dotenv()
         conn = psycopg2.connect(
@@ -235,6 +247,10 @@ def main():
         
         results.append(("Database Tables", len(missing_tables) == 0))
         
+    except ImportError as e:
+        print(f"  {colors.YELLOW}⚠️  Could not import psycopg2/dotenv: {e}{colors.END}")
+        print(f"     Install: pip install psycopg2-binary python-dotenv")
+        results.append(("Database Tables", False))
     except Exception as e:
         print(f"  {colors.YELLOW}⚠️  Could not verify database: {e}{colors.END}")
         results.append(("Database Tables", False))
@@ -255,6 +271,7 @@ def main():
     if all_passed:
         print(f"{colors.GREEN}{colors.BOLD}🎉 ALL STEPS COMPLETED SUCCESSFULLY!{colors.END}")
         print(f"\nThe pipeline is working end-to-end. Data flows from API → processed files → PostgreSQL → dbt models.")
+        print(f"\n{colors.BOLD}Next:{colors.END} Connect Power BI to PostgreSQL and load the tables.")
     else:
         print(f"{colors.RED}{colors.BOLD}❌ PIPELINE FAILED{colors.END}")
         print(f"\nSome steps did not complete successfully. Review errors above.")

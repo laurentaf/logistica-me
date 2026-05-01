@@ -265,11 +265,20 @@ API (download) → data/raw → Limpeza → data/processed → dbt seed → Post
 1. **Instalar Docker Desktop** para Windows
 2. **Instalar dependências Python** (requer Python 3.8+):
 ```bash
-# Criar ambiente virtual (opcional, mas recomendado)
-python -m venv .venv
-.venv\Scripts\activate  # No Windows: .venv\Scripts\activate
+# Criar ambiente virtual para dbt (recomendado)
+python -m venv .venv-dbt
+.venv-dbt\Scripts\Activate.ps1  # Windows PowerShell
 
-# Instalar pacotes
+# Instalar dbt e suas dependências
+pip install dbt-core dbt-postgres
+
+# OU execute o script automatizado
+python install_dbt.py
+```
+   - O projeto já inclui `.venv-dbt/` (crie se não existir)
+   - O `dbt` precisa estar no PATH ou ativo no venv
+3. **Instalar outras dependências Python**:
+```bash
 pip install -r requirements.txt
 ```
 3. **Configurar ambiente**:
