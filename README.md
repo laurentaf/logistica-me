@@ -13,16 +13,51 @@ Desenvolver um pipeline em Python/dbt que consome os dados brutos disponibilizad
 ## Arquitetura do Sistema
 
 ### 1. Estrutura de Dados
+
+#### Schema dos Dados (CSV)
+Cada arquivo CSV contém remessas logísticas com as seguintes colunas:
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| shipment_id | string (UUID) | Identificador único da remessa |
+| timestamp | ISO 8601 | Data/hora do evento de rastreamento |
+| origin | string | Local de origem da remessa |
+| destination | string | Local de destino da remessa |
+| weight_kg | float | Peso da remessa em quilogramas |
+| delivery_status | string | Status da entrega (ex: IN_TRANSIT, DELIVERED) |
+| vehicle_type | string | Tipo de veículo utilizado (ex: AIRPLANE, MOTORCYCLE) |
+| estimated_delay_minutes | integer | Atraso estimado em minutos |
+
+#### Diretórios
 ```
 data/raw/                    # Dados brutos da API
   dataset_*.csv              # Arquivos CSV originais
+  dataset_*_metadata.json    # Metadados de cada download
+  dataset_*_test_results.json # Resultados de testes de qualidade
   
+data/processed/              # Dados após limpeza e padronização
+  dataset_*_processed.csv
+  dataset_*_cleaning_report.json
+
 logistica_dbt/              # Projeto dbt
-  models/                   # Modelos SQL transformados
+  models/
+    staging/
+      stg_shipments.sql     # Staging: limpeza e padronização
+    marts/
+      fact_shipments.sql    # Tabela fato de remessas
+      dim_origins.sql       # Dimensão de origens
+      dim_destinations.sql  # Dimensão de destinos
+      dim_vehicles.sql      # Dimensão de veículos
+      dim_status.sql        # Dimensão de status
+      schema.yml            # Testes e documentação
+  seeds/                    # Arquivos CSV carregados via dbt seed
+    shipments_00001.csv
+    shipments_00002.csv
   tests/                    # Testes de qualidade de dados
-  seeds/                    # Dados semeados
-  
-reports/                    # Relatórios e resultados
+  macros/                   # Macros auxiliares
+
+config/                    # Configuração local (não Commitada)
+  seed_state.json          # Estado de carregamento incremental
 ```
 
 ### 2. Configuração do Banco de Dados
@@ -90,15 +125,14 @@ logistica_dbt:
 8. **Integrity Tests**: Integridade de arquivos
 
 #### Testes Específicos Implementados
-- ✅ `valid_ip_address.sql`: Validação de formato IPv4
 - ✅ `valid_timestamp_format.sql`: Validação de timestamp ISO 8601
-- ✅ `cross_file_duplicate_detection.sql`: Detecção de duplicatas entre arquivos
+- ✅ `valid_weight_kg.sql`: Validação de peso positivo
+- ✅ `valid_delay_minutes.sql`: Validação de atraso (não negativo)
+- ✅ `cross_file_duplicate_detection.sql`: Detecção de duplicatas entre arquivos (shipment_id)
 - ✅ `timestamp_freshness.sql`: Verificação de timestamps futuros
 - ✅ `null_rate_analysis.sql`: Análise de taxas de valores nulos por coluna
-- ✅ `statistical_outlier_detection.sql`: Detecção de outliers estatísticos
+- ✅ `statistical_outlier_detection.sql`: Detecção de outliers em peso e atraso
 - ✅ `data_freshness_score.sql`: Score de atualidade dos dados
-- ✅ `response_time_thresholds.sql`: Verificação de SLAs de tempo de resposta
-- ✅ `anomalous_response_times.sql`: Detecção de anomalias estatísticas
 
 ### 4. Power BI Integration
 
@@ -111,8 +145,10 @@ logistica_dbt:
 **Conexão**:
 - Usar conector nativo PostgreSQL do Power BI
 - Conectar a `localhost:5432` (PostgreSQL Docker)
-- A tabela `test_results` consolida todos os resultados de testes
-- Dashboard pode monitorar taxas de sucesso de testes ao longo do tempo
+- Principais tabelas para dashboard:
+  - `fact_shipments`: Fatos de remessas com métricas de atraso
+  - `dim_origins`, `dim_destinations`, `dim_vehicles`, `dim_status`: Dimensões para slicing/dicing
+  - Tabela de resultados de testes (se implementada) pode ser construída a partir dos JSONs
 
 ### 5. Pipeline de Dados Completo
 
@@ -141,24 +177,33 @@ API (download) → data/raw → Limpeza → data/processed → dbt seed → Post
    - Verifica conformidade com schema esperado
 
 3. **`data_processing_pipeline.py`** - Pipeline completo
-    ```bash
-    python data_processing_pipeline.py
-    ```
-    - Limpa dados brutos (timestamps, IPs, tipos)
-    - Salva versão limpa em `data/processed/`
-    - Não faz seededb (use `incremental_dbt_seed.py`)
+     ```bash
+     python data_processing_pipeline.py
+     ```
+     - Limpa dados brutos (timestamp, weight_kg, estimated_delay_minutes, normaliza textos)
+     - Salva versão limpa em `data/processed/`
+     - Não faz seededb (use `incremental_dbt_seed.py`)
 
 4. **`dbt`** - Transformação e carga
    ```bash
    cd logistica_dbt
-   dbt seed    # Carrega dados processados para PostgreSQL
-   dbt run     # Executa modelos transformados
+   dbt seed    # Carrega dados processados (shipments_*.csv) para PostgreSQL
+   dbt run     # Executa staging → dims/fact
    dbt test    # Executa testes de qualidade
    ```
 
 #### Setup Inicial (Windows com Docker)
 1. **Instalar Docker Desktop** para Windows
-2. **Configurar ambiente**:
+2. **Instalar dependências Python** (requer Python 3.8+):
+```bash
+# Criar ambiente virtual (opcional, mas recomendado)
+python -m venv .venv
+.venv\Scripts\activate  # No Windows: .venv\Scripts\activate
+
+# Instalar pacotes
+pip install -r requirements.txt
+```
+3. **Configurar ambiente**:
 ```powershell
 # Copiar .env.example para .env e configurar credenciais
 Copy-Item .env.example .env
@@ -167,7 +212,7 @@ Copy-Item .env.example .env
 notepad .env
 ```
 
-3. **Iniciar PostgreSQL Docker**:
+4. **Iniciar PostgreSQL Docker**:
 ```powershell
 # Método 1: Usar script automatizado
 .\docker-commands.ps1

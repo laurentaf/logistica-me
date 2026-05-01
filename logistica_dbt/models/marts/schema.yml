@@ -1,0 +1,86 @@
+version: 2
+
+models:
+  - name: fact_shipments
+    description: Tabela fato de remessas logísticas com métricas de atraso e joins para dimensões
+    columns:
+      - name: shipment_id
+        description: Identificador único da remessa
+        tests:
+          - unique
+          - not_null
+      - name: event_timestamp
+        description: Timestamp do evento
+        tests:
+          - not_null
+      - name: weight_kg
+        description: Peso da remessa em quilogramas
+        tests:
+          - positive_value
+      - name: estimated_delay_minutes
+        description: Atraso estimado em minutos
+      - name: origin_id
+        description: FK para dim_origins
+      - name: destination_id
+        description: FK para dim_destinations
+      - name: vehicle_id
+        description: FK para dim_vehicles
+      - name: status_id
+        description: FK para dim_status
+
+  - name: dim_origins
+    description: Dimensão de origens das remessas
+    columns:
+      - name: origin_id
+        description: Chave surrogate
+        tests:
+          - unique
+          - not_null
+      - name: origin_name
+        description: Nome da origem
+        tests:
+          - not_null
+
+  - name: dim_destinations
+    description: Dimensão de destinos das remessas
+    columns:
+      - name: destination_id
+        description: Chave surrogate
+        tests:
+          - unique
+          - not_null
+      - name: destination_name
+        description: Nome do destino
+        tests:
+          - not_null
+
+  - name: dim_vehicles
+    description: Dimensão de tipos de veículo
+    columns:
+      - name: vehicle_id
+        description: Chave surrogate
+        tests:
+          - unique
+          - not_null
+      - name: vehicle_type
+        description: Tipo de veículo
+        tests:
+          - not_null
+
+  - name: dim_status
+    description: Dimensão de status de entrega
+    columns:
+      - name: status_id
+        description: Chave surrogate
+        tests:
+          - unique
+          - not_null
+      - name: delivery_status
+        description: Status da remessa
+        tests:
+          - not_null
+      - name: is_delivered
+        description: Flag se entregue
+        tests:
+          - accepted_values:
+              values: [true, false]

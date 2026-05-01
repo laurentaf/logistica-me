@@ -47,59 +47,63 @@ def clean_and_process_csv(raw_file, processed_dir="data/processed"):
         "rows_cleaned": original_rows,
         "columns_processed": len(df.columns),
         "timestamp_fixes": 0,
-        "ip_fixes": 0,
-        "response_time_fixes": 0,
-        "status_code_fixes": 0
+        "weight_fixes": 0,
+        "delay_fixes": 0,
+        "id_fixes": 0
     }
+    
+    # Standardize column names: lowercase and strip
+    df.columns = [c.strip().lower() for c in df.columns]
+    
+    # Expected columns for logistic data
+    expected_cols = ['shipment_id', 'timestamp', 'origin', 'destination', 'weight_kg', 'delivery_status', 'vehicle_type', 'estimated_delay_minutes']
+    missing_cols = [c for c in expected_cols if c not in df.columns]
+    if missing_cols:
+        print(f"❌ Missing columns in {raw_file}: {missing_cols}")
+        return None
     
     # Clean timestamp: ensure ISO format
     if 'timestamp' in df.columns:
         before = df['timestamp'].copy()
         df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce', utc=True).dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
-        # Restore NaT (parsing failures) to original
         mask = df['timestamp'].isna()
         df.loc[mask, 'timestamp'] = before[mask]
         cleaning_stats["timestamp_fixes"] = (df['timestamp'] != before).sum()
     
-    # Clean response_time_ms: ensure integer
-    if 'response_time_ms' in df.columns:
-        before = df['response_time_ms'].copy()
-        # Convert to numeric, errors='coerce' turns invalid values into NaN
-        df['response_time_ms'] = pd.to_numeric(df['response_time_ms'], errors='coerce')
-        # Round to integer (floor) and fill NaN with original where conversion failed
-        df['response_time_ms'] = df['response_time_ms'].apply(
+    # Clean weight_kg: convert to float
+    if 'weight_kg' in df.columns:
+        before = df['weight_kg'].copy()
+        df['weight_kg'] = pd.to_numeric(df['weight_kg'], errors='coerce')
+        cleaning_stats["weight_fixes"] = df['weight_kg'].notna().sum() - before.notna().sum()
+    
+    # Clean estimated_delay_minutes: convert to integer
+    if 'estimated_delay_minutes' in df.columns:
+        before = df['estimated_delay_minutes'].copy()
+        df['estimated_delay_minutes'] = pd.to_numeric(df['estimated_delay_minutes'], errors='coerce')
+        df['estimated_delay_minutes'] = df['estimated_delay_minutes'].apply(
             lambda x: int(x) if pd.notna(x) else None
         )
-        # Count how many were successfully converted to int
-        cleaning_stats["response_time_fixes"] = df['response_time_ms'].notna().sum() - before.notna().sum()
+        cleaning_stats["delay_fixes"] = df['estimated_delay_minutes'].notna().sum() - before.notna().sum()
     
-    # Clean status_code: ensure integer
-    if 'status_code' in df.columns:
-        before = df['status_code'].copy()
-        df['status_code'] = pd.to_numeric(df['status_code'], errors='coerce')
-        df['status_code'] = df['status_code'].apply(
-            lambda x: int(x) if pd.notna(x) else None
-        )
-        cleaning_stats["status_code_fixes"] = df['status_code'].notna().sum() - before.notna().sum()
+    # Ensure shipment_id is string and clean
+    if 'shipment_id' in df.columns:
+        before = df['shipment_id'].copy()
+        df['shipment_id'] = df['shipment_id'].astype(str).str.strip()
+        cleaning_stats["id_fixes"] = (df['shipment_id'] != before).sum()
     
-    # Clean IP address: basic validation (keep simple IPv4 pattern)
-    if 'ip_address' in df.columns:
-        before = df['ip_address'].copy()
-        # Simple IPv4 pattern: 4 octets of 0-255 separated by dots
-        ipv4_pattern = r'^\d{1,3}(\.\d{1,3}){3}$'
-        valid_mask = df['ip_address'].str.match(ipv4_pattern, na=False)
-        # Replace invalid IPs with None
-        df['ip_address'] = df['ip_address'].where(valid_mask, None)
-        cleaning_stats["ip_fixes"] = (~valid_mask).sum()
+    # Normalize text fields
+    for col in ['origin', 'destination', 'delivery_status', 'vehicle_type']:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip()
     
-    # Write processed CSV (use index=False to avoid extra column)
+    # Write processed CSV
     df.to_csv(processed_path, index=False)
     
     print(f"✅ Processed {cleaning_stats['rows_cleaned']} rows")
     print(f"   Timestamp fixes: {cleaning_stats['timestamp_fixes']}")
-    print(f"   IP fixes: {cleaning_stats['ip_fixes']}")
-    print(f"   Response time fixes: {cleaning_stats['response_time_fixes']}")
-    print(f"   Status code fixes: {cleaning_stats['status_code_fixes']}")
+    print(f"   Weight fixes: {cleaning_stats['weight_fixes']}")
+    print(f"   Delay fixes: {cleaning_stats['delay_fixes']}")
+    print(f"   ID fixes: {cleaning_stats['id_fixes']}")
     
     # Save cleaning report
     report_path = Path(processed_dir) / raw_path.name.replace(".csv", "_cleaning_report.json")
@@ -178,16 +182,12 @@ def run_full_pipeline():
     
     print(f"✅ Successfully processed {len(processed_files)} files")
     
-    # Step 3: Prepare for dbt seed (Just copy; incremental_dbt_seed.py manages incremental load)
-    seed_files = prepare_dbt_seeds()
-    
     print("\n" + "=" * 60)
     print("🎉 PIPELINE COMPLETED SUCCESSFULLY")
     print("=" * 60)
     print(f"📊 Summary:")
     print(f"   Raw files: {len(raw_files)}")
     print(f"   Processed files: {len(processed_files)}")
-    print(f"   Seed files prepared: {len(seed_files)}")
     print("\n📋 Next steps:")
     print("   1. Run incremental dbt seed to load new data to PostgreSQL")
     print("      python3 incremental_dbt_seed.py")
@@ -196,7 +196,6 @@ def run_full_pipeline():
     print("   3. Run data quality tests")
     print("      dbt test")
     print("\n📈 Processed data available in: data/processed/")
-    print("🌱 dbt seeds available in: logistica_dbt/seeds/")
 
 if __name__ == "__main__":
     run_full_pipeline()

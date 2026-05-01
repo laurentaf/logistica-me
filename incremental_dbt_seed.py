@@ -91,7 +91,7 @@ class IncrementalDBTSeed:
         if not seq.isdigit():
             raise ValueError(f"Could not extract sequence from filename: {processed_path.name}")
         
-        seed_name = f"raw_logs_{seq}"
+        seed_name = f"shipments_{seq}"
         seed_filename = f"{seed_name}.csv"
         seed_path = Path(self.seeds_dir) / seed_filename
         
