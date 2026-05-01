@@ -6,26 +6,40 @@ WITH shipments_with_keys AS (
         s.event_timestamp,
         s.weight_kg,
         s.estimated_delay_minutes,
-        o.origin_id,
-        d.destination_id,
+        r.route_id,
         v.vehicle_id,
-        st.status_id
+        i.incident_id,
+        -- Derived metrics
+        CASE WHEN s.estimated_delay_minutes <= 0 THEN TRUE ELSE FALSE END AS is_on_time,
+        CASE WHEN s.estimated_delay_minutes > 0 THEN TRUE ELSE FALSE END AS is_delayed,
+        DATE_TRUNC('day', s.event_timestamp) AS event_date,
+        DATE_TRUNC('hour', s.event_timestamp) AS event_hour
     FROM {{ ref('stg_shipments') }} s
-    LEFT JOIN {{ ref('dim_origins') }} o ON o.origin_name = s.origin
-    LEFT JOIN {{ ref('dim_destinations') }} d ON d.destination_name = s.destination
-    LEFT JOIN {{ ref('dim_vehicles') }} v ON v.vehicle_type = s.vehicle_type
-    LEFT JOIN {{ ref('dim_status') }} st ON st.delivery_status = s.delivery_status
+    LEFT JOIN {{ ref('dim_routes') }} r 
+        ON r.origin = s.origin 
+        AND r.destination = s.destination
+    LEFT JOIN {{ ref('dim_vehicles') }} v 
+        ON v.vehicle_type = s.vehicle_type
+    LEFT JOIN {{ ref('dim_incidents') }} i 
+        ON i.delivery_status = s.delivery_status
+        AND i.delay_category = CASE
+            WHEN s.estimated_delay_minutes <= 0 THEN 'ON_TIME'
+            WHEN s.estimated_delay_minutes <= 30 THEN 'MINOR_DELAY'
+            WHEN s.estimated_delay_minutes <= 60 THEN 'MODERATE_DELAY'
+            ELSE 'MAJOR_DELAY'
+        END
 )
 
 SELECT
     shipment_id,
     event_timestamp,
-    origin_id,
-    destination_id,
+    route_id,
     vehicle_id,
-    status_id,
+    incident_id,
     weight_kg,
     estimated_delay_minutes,
-    DATE_TRUNC('day', event_timestamp) AS event_date,
-    DATE_TRUNC('hour', event_timestamp) AS event_hour
+    is_on_time,
+    is_delayed,
+    event_date,
+    event_hour
 FROM shipments_with_keys

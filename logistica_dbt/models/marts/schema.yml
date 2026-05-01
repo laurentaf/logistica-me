@@ -1,8 +1,28 @@
 version: 2
 
 models:
+  # SEED: Test Registry
+  - name: test_registry
+    description: Registro de todos os testes de qualidade de dados com metadados (tipo, fase, ferramenta, métrica)
+    columns:
+      - name: test_name
+        description: Nome único do teste
+      - name: test_type
+        description: Tipo de teste (completeness, uniqueness, validity, accuracy, timeliness, etc.)
+      - name: phase
+        description: Fase do pipeline (staging, marts, dimension)
+      - name: tool
+        description: Ferramenta utilizada (dbt, custom, etc.)
+      - name: metric
+        description: Métrica ou coluna que o teste valida
+      - name: description
+        description: Descrição do que o teste verifica
+      - name: model_name
+        description: Modelo ao qual o teste pertence
+
+  # CORE FACT & DIMENSIONS
   - name: fact_shipments
-    description: Tabela fato de remessas logísticas com métricas de atraso e joins para dimensões
+    description: Tabela fato de remessas logísticas com métricas de atraso e dimensões de rotas, veículos e incidentes
     columns:
       - name: shipment_id
         description: Identificador único da remessa
@@ -13,46 +33,73 @@ models:
         description: Timestamp do evento
         tests:
           - not_null
+      - name: route_id
+        description: FK para dim_routes
+        tests:
+          - not_null
+          - relationships:
+              to: dim_routes
+              field: route_id
+      - name: vehicle_id
+        description: FK para dim_vehicles
+        tests:
+          - not_null
+          - relationships:
+              to: dim_vehicles
+              field: vehicle_id
+      - name: incident_id
+        description: FK para dim_incidents
+        tests:
+          - not_null
+          - relationships:
+              to: dim_incidents
+              field: incident_id
       - name: weight_kg
         description: Peso da remessa em quilogramas
         tests:
           - positive_value
       - name: estimated_delay_minutes
         description: Atraso estimado em minutos
-      - name: origin_id
-        description: FK para dim_origins
-      - name: destination_id
-        description: FK para dim_destinations
-      - name: vehicle_id
-        description: FK para dim_vehicles
-      - name: status_id
-        description: FK para dim_status
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "estimated_delay_minutes IS NOT NULL"
+      - name: is_on_time
+        description: Flag se a remessa chegou no prazo (atraso <= 0). Deve ser consistente com is_delayed e estimated_delay_minutes.
+        tests:
+          - accepted_values:
+              values: [true, false]
+          - dbt_utils.expression_is_true:
+              expression: "(estimated_delay_minutes <= 0 AND is_on_time = true) OR (estimated_delay_minutes > 0 AND is_on_time = false)"
+      - name: is_delayed
+        description: Flag se a remessa está atrasada (atraso > 0). Deve ser consistente com is_on_time e estimated_delay_minutes.
+        tests:
+          - accepted_values:
+              values: [true, false]
+          - dbt_utils.expression_is_true:
+              expression: "(estimated_delay_minutes > 0 AND is_delayed = true) OR (estimated_delay_minutes <= 0 AND is_delayed = false)"
+      - name: event_date
+        description: Data do evento (truncada para dia)
+      - name: event_hour
+        description: Hora do evento (truncada para hora)
 
-  - name: dim_origins
-    description: Dimensão de origens das remessas
+  - name: dim_routes
+    description: Dimensão de rotas (combinação origem-destino)
     columns:
-      - name: origin_id
-        description: Chave surrogate
+      - name: route_id
+        description: Chave surrogate da rota
         tests:
           - unique
           - not_null
-      - name: origin_name
-        description: Nome da origem
+      - name: origin
+        description: Origem da rota
         tests:
           - not_null
-
-  - name: dim_destinations
-    description: Dimensão de destinos das remessas
-    columns:
-      - name: destination_id
-        description: Chave surrogate
-        tests:
-          - unique
-          - not_null
-      - name: destination_name
-        description: Nome do destino
+      - name: destination
+        description: Destino da rota
         tests:
           - not_null
+      - name: route_name
+        description: Nome formatado da rota (ex: "Cidade A → Cidade B")
 
   - name: dim_vehicles
     description: Dimensão de tipos de veículo
@@ -67,20 +114,288 @@ models:
         tests:
           - not_null
 
-  - name: dim_status
-    description: Dimensão de status de entrega
+  - name: dim_incidents
+    description: Dimensão de incidentes/ocorrências (baseado em status de entrega e atraso)
     columns:
-      - name: status_id
-        description: Chave surrogate
+      - name: incident_id
+        description: Chave surrogate do incidente
         tests:
           - unique
           - not_null
       - name: delivery_status
-        description: Status da remessa
+        description: Status da entrega (ex: DELIVERED, IN_TRANSIT)
         tests:
           - not_null
-      - name: is_delivered
-        description: Flag se entregue
+      - name: delay_category
+        description: Categoria de atraso
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['ON_TIME', 'MINOR_DELAY', 'MODERATE_DELAY', 'MAJOR_DELAY']
+      - name: is_on_time
+        description: Flag se o incidente representa entrega no prazo
+      - name: is_delayed
+        description: Flag se o incidente representa atraso
+      - name: incident_type
+        description: Tipo combinado de status e atraso (ex: "DELIVERED - MINOR_DELAY")
+
+  # RISK ANALYSIS & FORECAST MODELS
+  - name: risk_route_analysis
+    description: Análise de risco por rota - identifica rotas com maiores taxas e valores de atraso, calcula score de risco
+    columns:
+      - name: route_id
+        description: Chave da rota
+        tests:
+          - not_null
+      - name: origin
+        description: Origem da rota
+      - name: destination
+        description: Destino da rota
+      - name: route_name
+        description: Nome formatado da rota
+      - name: total_shipments
+        description: Total de remessas na rota
+        tests:
+          - positive_value
+      - name: delayed_shipments
+        description: Número de remessas atrasadas
+      - name: on_time_shipments
+        description: Número de remessas no prazo
+      - name: avg_delay_minutes
+        description: Atraso médio em minutos
+      - name: median_delay_minutes
+        description: Atraso mediano em minutos
+      - name: max_delay_minutes
+        description: Maior atraso registrado na rota
+      - name: stddev_delay_minutes
+        description: Desvio padrão dos atrasos
+      - name: q1_delay
+        description: Primeiro quartil dos atrasos (25%)
+      - name: q3_delay
+        description: Terceiro quartil dos atrasos (75%)
+      - name: pct_delayed
+        description: Percentual de remessas atrasadas
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "pct_delayed >= 0 AND pct_delayed <= 100"
+      - name: risk_score
+        description: Score de risco de 0 a 100 (combinado avg delay e % delayed)
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "risk_score >= 0 AND risk_score <= 100"
+      - name: risk_category
+        description: Categoria de risco (HIGH, MEDIUM, LOW) baseada no score
         tests:
           - accepted_values:
-              values: [true, false]
+              values: ['HIGH', 'MEDIUM', 'LOW']
+
+  - name: risk_vehicle_analysis
+    description: Análise de risco por tipo de veículo - identifica veículos com maior propensão a atrasos
+    columns:
+      - name: vehicle_id
+        description: Chave do veículo
+        tests:
+          - not_null
+      - name: vehicle_type
+        description: Tipo de veículo
+      - name: total_shipments
+        description: Total de remessas com este veículo
+        tests:
+          - positive_value
+      - name: delayed_shipments
+        description: Remessas atrasadas por veículo
+      - name: on_time_shipments
+        description: Remessas no prazo por veículo
+      - name: avg_delay_minutes
+        description: Atraso médio por tipo de veículo
+      - name: median_delay_minutes
+        description: Atraso mediano
+      - name: max_delay_minutes
+        description: Maior atraso por veículo
+      - name: stddev_delay_minutes
+        description: Desvio padrão dos atrasos por veículo
+      - name: q1_delay
+        description: Primeiro quartil
+      - name: q3_delay
+        description: Terceiro quartil
+      - name: pct_delayed
+        description: Percentual de atrasos por veículo
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "pct_delayed >= 0 AND pct_delayed <= 100"
+      - name: risk_score
+        description: Score de risco do veículo (0-100)
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "risk_score >= 0 AND risk_score <= 100"
+      - name: risk_category
+        description: Categoria de risco do veículo
+        tests:
+          - accepted_values:
+              values: ['HIGH', 'MEDIUM', 'LOW']
+
+  - name: risk_temporal_patterns
+    description: Análise de padrões temporais de atrasos - identifica horários, dias da semana e períodos com maior risco
+    columns:
+      - name: event_date
+        description: Data do evento
+      - name: event_hour
+        description: Hora do evento
+      - name: day_of_week
+        description: Dia da semana (0-6, onde 0= Domingo)
+      - name: is_weekend
+        description: Flag se é fim de semana
+      - name: time_of_day_bucket
+        description: Período do dia (MORNING_RUSH, MIDDAY, AFTERNOON_RUSH, EVENING, NIGHT)
+      - name: total_shipments
+        description: Total de remessas no período
+        tests:
+          - positive_value
+      - name: delayed_shipments
+        description: Remessas atrasadas no período
+      - name: avg_delay_minutes
+        description: Atraso médio no período
+      - name: median_delay_minutes
+        description: Atraso mediano no período
+      - name: max_delay_minutes
+        description: Maior atraso no período
+      - name: stddev_delay_minutes
+        description: Desvio padrão dos atrasos no período
+      - name: pct_delayed
+        description: Percentual de atrasos no período
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "pct_delayed >= 0 AND pct_delayed <= 100"
+      - name: avg_weight_kg
+        description: Peso médio no período
+      - name: heavy_shipments_count
+        description: Contagem de remessas pesadas no período
+      - name: most_common_vehicle_type
+        description: Tipo de veículo mais comum no período
+
+  - name: risk_delay_drivers
+    description: Análise multidimensional de drivers de atraso - identifica combinações de fatores que mais contribuem para atrasos
+    columns:
+      - name: analysis_type
+        description: Tipo de análise (ROUTE_VEHICLE, ROUTE_TIME, VEHICLE_TIME, WEIGHT_DELAY, OVERALL_RANKING)
+      - name: factor_type
+        description: Tipo de fator analisado (ROUTE, VEHICLE, TIME, WEIGHT)
+      - name: route_id
+        description: ID da rota (quando aplicável)
+      - name: route_name
+        description: Nome da rota (quando aplicável)
+      - name: vehicle_id
+        description: ID do veículo (quando aplicável)
+      - name: vehicle_type
+        description: Tipo de veículo (quando aplicável)
+      - name: secondary_factor
+        description: Fator secundário (ex: time_of_day, weight_category)
+      - name: tertiary_factor
+        description: Fator terciário (ex: weekday_weekend, delay_category)
+      - name: total_shipments
+        description: Total de remessas na combinação
+      - name: delayed_shipments
+        description: Remessas atrasadas na combinação
+      - name: delay_rate_pct
+        description: Taxa de atraso percentual na combinação
+      - name: avg_delay
+        description: Atraso médio na combinação
+      - name: median_delay
+        description: Atraso mediano na combinação
+      - name: max_delay
+        description: Maior atraso na combinação
+      - name: driver_dimension
+        description: Dimensão do driver analysis
+
+  - name: risk_forecast_features
+    description: Tabela de features para forecasting de atrasos - dados agregados diariamente por rota-veículo-período, com features de lag e tendência
+    columns:
+      - name: event_date
+        description: Data do agregação
+      - name: route_id
+        description: ID da rota
+        tests:
+          - not_null
+      - name: vehicle_id
+        description: ID do veículo
+        tests:
+          - not_null
+      - name: time_of_day_bucket
+        description: Período do dia (MORNING_RUSH, MIDDAY, AFTERNOON_RUSH, EVENING, NIGHT)
+      - name: weekday_weekend
+        description: Se é dia de semana ou fim de semana
+      - name: avg_weight_kg
+        description: Peso médio das remessas no dia/período
+      - name: total_shipments
+        description: Total de remessas
+        tests:
+          - positive_value
+      - name: delayed_shipments
+        description: Remessas atrasadas
+      - name: on_time_shipments
+        description: Remessas no prazo
+      - name: avg_delay_minutes
+        description: Atraso médio do dia
+      - name: median_delay_minutes
+        description: Atraso mediano
+      - name: max_delay_minutes
+        description: Maior atraso do dia
+      - name: stddev_delay_minutes
+        description: Desvio padrão dos atrasos
+      - name: q1_delay
+        description: Primeiro quartil dos atrasos
+      - name: q3_delay
+        description: Terceiro quartil dos atrasos
+      - name: delay_rate_pct
+        description: Taxa de atraso percentual
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "delay_rate_pct >= 0 AND delay_rate_pct <= 100"
+      - name: heavy_shipment_pct
+        description: Percentual de remessas pesadas
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "heavy_shipment_pct >= 0 AND heavy_shipment_pct <= 100"
+      - name: most_common_delay_category
+        description: Categoria de atraso mais comum no dia
+      - name: most_common_vehicle_type
+        description: Tipo de veículo mais comum no dia
+      - name: route_risk_score
+        description: Score de risco da rota (do modelo risk_route_analysis)
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "route_risk_score >= 0 AND route_risk_score <= 100"
+      - name: route_risk_category
+        description: Categoria de risco da rota
+        tests:
+          - accepted_values:
+              values: ['HIGH', 'MEDIUM', 'LOW']
+      - name: vehicle_risk_score
+        description: Score de risco do veículo (do modelo risk_vehicle_analysis)
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "vehicle_risk_score >= 0 AND vehicle_risk_score <= 100"
+      - name: vehicle_risk_category
+        description: Categoria de risco do veículo
+        tests:
+          - accepted_values:
+              values: ['HIGH', 'MEDIUM', 'LOW']
+      - name: combined_risk_level
+        description: Nível de risco combinado (HIGH, MEDIUM, LOW)
+        tests:
+          - accepted_values:
+              values: ['HIGH', 'MEDIUM', 'LOW']
+      - name: prev_day_shipments
+        description: Total de remessas do dia anterior (feature de lag)
+      - name: prev_day_avg_delay
+        description: Atraso médio do dia anterior (lag)
+      - name: prev_day_delay_rate
+        description: Taxa de atraso do dia anterior (lag)
+      - name: moving_avg_7day_delay
+        description: Média móvel de 7 dias do atraso médio
+      - name: moving_avg_7day_delay_rate
+        description: Média móvel de 7 dias da taxa de atraso
+      - name: delay_change_from_prev_day
+        description: Variação do atraso médio em relação ao dia anterior
+      - name: delay_rate_change_from_prev_day
+        description: Variação da taxa de atraso em relação ao dia anterior

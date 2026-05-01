@@ -1,0 +1,20 @@
+version: 2
+
+seeds:
+  - name: test_registry
+    description: Catálogo de todos os testes de qualidade de dados implementados no projeto. Contém metadados como tipo, fase, ferramenta e métrica de cada teste.
+    columns:
+      - name: test_name
+        description: Nome único do teste
+      - name: test_type
+        description: Tipo de teste (completeness, uniqueness, validity, accuracy, timeliness, statistical)
+      - name: phase
+        description: Fase do pipeline onde o teste é executado (staging, marts, dimension)
+      - name: tool
+        description: Ferramenta utilizada (dbt, custom_python)
+      - name: metric
+        description: Métrica ou coluna que o teste valida
+      - name: description
+        description: Descrição do que o teste verifica
+      - name: model_name
+        description: Modelo ao qual o teste pertence

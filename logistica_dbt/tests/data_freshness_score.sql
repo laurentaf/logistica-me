@@ -2,7 +2,7 @@
 
 WITH latest_timestamp AS (
   SELECT MAX(event_timestamp) as latest_ts
-  FROM {{ ref('stg_raw_logs') }}
+  FROM {{ ref('stg_shipments') }}
 ),
 
 freshness_metrics AS (
@@ -12,7 +12,7 @@ freshness_metrics AS (
     EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - l.latest_ts)) / 3600 as hours_since_latest,
     COUNT(*) as total_records,
     COUNT(DISTINCT DATE(event_timestamp)) as unique_days
-  FROM {{ ref('stg_raw_logs') }}
+  FROM {{ ref('stg_shipments') }}
   CROSS JOIN latest_timestamp l
 )
 

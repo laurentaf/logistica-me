@@ -108,7 +108,7 @@ if os.path.exists(csv_file):
             }})
             
             # Test 4: Column names
-            expected_columns_list = ['log_id', 'timestamp', 'ip_address', 'http_method', 'endpoint', 'status_code', 'response_time_ms', 'user_agent']
+            expected_columns_list = ['shipment_id', 'timestamp', 'origin', 'destination', 'weight_kg', 'delivery_status', 'vehicle_type', 'estimated_delay_minutes']
             column_match = headers == expected_columns_list
             
             test_results["tests"].append({{
@@ -134,30 +134,30 @@ if os.path.exists(csv_file):
             # Store column information with data types
             column_info = []
             for i, header in enumerate(headers):
-                data_type = "string"  # Default
-                if header == 'log_id':
-                    data_type = "uuid"
-                elif header == 'timestamp':
-                    data_type = "iso8601_datetime"
-                elif header == 'status_code':
-                    data_type = "integer"
-                elif header == 'response_time_ms':
-                    data_type = "integer"
+                 data_type = "string"  # Default
+                 if header == 'shipment_id':
+                     data_type = "uuid"
+                 elif header == 'timestamp':
+                     data_type = "iso8601_datetime"
+                 elif header == 'weight_kg':
+                     data_type = "float"
+                 elif header == 'estimated_delay_minutes':
+                     data_type = "integer"
                 
                 column_info.append({{
                     "name": header,
                     "position": i + 1,
                     "expected_type": data_type,
-                    "description": {{
-                        "log_id": "Unique identifier (UUID format)",
-                        "timestamp": "Event timestamp in ISO 8601 format (YYYY-MM-DDTHH:MM:SS.ssssss)",
-                        "ip_address": "Client IP address (IPv4 format)",
-                        "http_method": "HTTP method (GET, POST, PUT, DELETE, etc.)",
-                        "endpoint": "API endpoint path",
-                        "status_code": "HTTP status code (integer: 200, 404, 500, etc.)",
-                        "response_time_ms": "Response time in milliseconds (integer)",
-                        "user_agent": "Client user agent string"
-                    }}[header]
+                        "description": {{
+                            "shipment_id": "Unique identifier (UUID format)",
+                            "timestamp": "Event timestamp in ISO 8601 format (YYYY-MM-DDTHH:MM:SS.ssssss)",
+                            "origin": "Origin location of the shipment",
+                            "destination": "Destination location of the shipment",
+                            "weight_kg": "Weight of the shipment in kilograms (float)",
+                            "delivery_status": "Current delivery status (string)",
+                            "vehicle_type": "Type of vehicle used for transportation",
+                            "estimated_delay_minutes": "Estimated delay in minutes (integer, can be negative for early delivery)"
+                        }}[header]
                 }})
             
             test_results["columns"] = column_info

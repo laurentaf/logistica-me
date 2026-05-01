@@ -110,11 +110,12 @@ dbt test   # Run data quality tests
    - Username: `postgres`
    - Password: From `.env`
 
-4. Key tables for Power BI:
-   - `test_results`: Consolidated test outcomes
-   - `fact_log_events`: Main fact table
-   - `dim_endpoints`: Endpoint statistics
-   - `dim_time_periods`: Time-based aggregations
+ 4. Key tables for Power BI:
+    - `test_results`: Consolidated test outcomes
+    - `fact_shipments`: Main fact table
+    - `dim_routes`: Route dimension
+    - `dim_vehicles`: Vehicle type dimension
+    - `dim_incidents`: Incident dimension
 
 ## Migration to Docker PostgreSQL on Windows
 

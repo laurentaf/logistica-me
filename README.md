@@ -44,11 +44,10 @@ logistica_dbt/              # Projeto dbt
     staging/
       stg_shipments.sql     # Staging: limpeza e padronização
     marts/
-      fact_shipments.sql    # Tabela fato de remessas
-      dim_origins.sql       # Dimensão de origens
-      dim_destinations.sql  # Dimensão de destinos
-      dim_vehicles.sql      # Dimensão de veículos
-      dim_status.sql        # Dimensão de status
+      fact_shipments.sql    # Tabela fato de remessas com métricas de atraso
+      dim_routes.sql        # Dimensão de rotas (origem-destino)
+      dim_vehicles.sql      # Dimensão de tipos de veículo
+      dim_incidents.sql     # Dimensão de incidentes/ocorrências (atrasos)
       schema.yml            # Testes e documentação
   seeds/                    # Arquivos CSV carregados via dbt seed
     shipments_00001.csv
@@ -134,6 +133,25 @@ logistica_dbt:
 - ✅ `statistical_outlier_detection.sql`: Detecção de outliers em peso e atraso
 - ✅ `data_freshness_score.sql`: Score de atualidade dos dados
 
+#### Registro de Testes (Test Tracking)
+Todos os testes implementados são registrados na tabela `test_registry` no esquema `public` do PostgreSQL. Esta tabela contém metadados de cada teste, incluindo:
+
+- `test_name`: Nome único do teste
+- `test_type`: Tipo de teste (completeness, uniqueness, validity, accuracy, timeliness, etc.)
+- `phase`: Fase do pipeline (staging, marts, dimension)
+- `tool`: Ferramenta utilizada (dbt, custom_python)
+- `metric`: Métrica ou coluna que o teste valida
+- `description`: Descrição do que o teste verifica
+- `model_name`: Modelo ao qual o teste pertence
+
+**Como gerar a tabela de registro:**
+```bash
+cd logistica_dbt
+dbt seed --select test_registry
+```
+
+A tabela `test_registry` estará disponível no PostgreSQL e pode ser utilizada para auditoria e monitoramento da cobertura de testes.
+
 ### 4. Power BI Integration
 
 **Requisitos**:
@@ -147,8 +165,59 @@ logistica_dbt:
 - Conectar a `localhost:5432` (PostgreSQL Docker)
 - Principais tabelas para dashboard:
   - `fact_shipments`: Fatos de remessas com métricas de atraso
-  - `dim_origins`, `dim_destinations`, `dim_vehicles`, `dim_status`: Dimensões para slicing/dicing
-  - Tabela de resultados de testes (se implementada) pode ser construída a partir dos JSONs
+  - `dim_routes`, `dim_vehicles`, `dim_incidents`: Dimensões para slicing/dicing
+  - `risk_route_analysis`, `risk_vehicle_analysis`, `risk_temporal_patterns`, `risk_delay_drivers`, `risk_forecast_features`: Modelos de previsão de risco
+  - `test_registry`: Catálogo de testes de qualidade de dados
+
+#### Gerando Datasets para Power BI
+
+O pipeline gera automaticamente as tabelas necessárias no PostgreSQL. Siga os passos abaixo para popular o banco de dados:
+
+**Passo 1: Baixar dados da API**
+```bash
+python API.py --count 1
+```
+- Baixa novos arquivos CSV da API para `data/raw/`
+- Executa testes básicos de qualidade em cada arquivo
+- Gera metadados e relatórios de conformidade
+
+**Passo 2: Processar e limpar dados**
+```bash
+python data_processing_pipeline.py
+```
+- Limpa e padroniza os dados brutos
+- Salva versão processada em `data/processed/`
+
+**Passo 3: Carregar dados no PostgreSQL (incremental)**
+```bash
+python incremental_dbt_seed.py
+```
+- Carrega apenas arquivos novos no PostgreSQL via `dbt seed`
+- Mantém histórico de arquivos carregados em `config/seed_state.json`
+
+**Passo 4: Executar transformações dbt**
+```bash
+cd logistica_dbt
+dbt run --profiles-dir .
+```
+- Executa todos os modelos: staging, dimensões, fatos, modelos de risco
+
+**Passo 5: Executar testes de qualidade**
+```bash
+dbt test --profiles-dir .
+```
+- Valida a qualidade dos dados em todas as fases
+- Exibe resultados no console
+
+**Aplicação Pronta**: Após a execução completa, todas as tabelas listadas acima estarão disponíveis no PostgreSQL e prontas para conexão no Power BI.
+
+**Atualização Incremental Diária**:
+```bash
+python API.py
+python data_processing_pipeline.py
+python incremental_dbt_seed.py
+cd logistica_dbt && dbt run && dbt test
+```
 
 ### 5. Pipeline de Dados Completo
 
@@ -240,9 +309,6 @@ dbt run --profiles-dir .
 
 # 6. Rodar testes de qualidade de dados
 dbt test --profiles-dir .
-
-# 7. Gerar relatório consolidado de testes
-dbt run --model test_results --profiles-dir .
 ```
 
 #### Pipeline Incremental Automatizado
@@ -255,6 +321,47 @@ python incremental_dbt_seed.py
 - **Mantém histórico** de arquivos carregados
 - **Renomeia seeds** para `raw_logs_{seq}.csv` automaticamente
 - **Executa dbt seed** apenas para seeds novas
+
+### 6. Previsão de Risco e Análise de Drivers de Atraso
+
+O projeto inclui uma série de modelos analíticos para identificar os principais fatores que contribuem para atrasos nas entregas:
+
+#### Modelos de Análise de Risco
+
+- **`risk_route_analysis`**: Análise de risco por rota (origem-destino)
+  - Calcula métricas: taxa de atraso, atraso médio/mediano, desvio padrão
+  - Score de risco combinado (0-100) baseado em atraso médio e percentual de atrasos
+  - Categorização: HIGH, MEDIUM, LOW
+  - Identifica rotas críticas que precisam de atenção
+
+- **`risk_vehicle_analysis`**: Análise de risco por tipo de veículo
+  - Avalia desempenho de cada tipo de veículo (caminhão, moto, avião, etc.)
+  - Relaciona peso médio das cargas com atrasos
+  - Identifica veículos com maior propensão a atrasos
+
+- **`risk_temporal_patterns`**: Análise de padrões temporais
+  - Identifica horários do dia, dias da semana e períodos (rush hour) com maiores atrasos
+  - Agrupa em buckets: MORNING_RUSH, MIDDAY, AFTERNOON_RUSH, EVENING, NIGHT
+  - Determina se fins de semana têm diferentes padrões de atraso
+
+- **`risk_delay_drivers`**: Análise multidimensional de drivers
+  - Combina múltiplos fatores (rota x veículo, rota x horário, veículo x horário, peso x atraso)
+  - Fornece ranking geral dos fatores que mais contribuem para atrasos
+  - Identifica combinações específicas de alto risco
+
+- **`risk_forecast_features`**: Tabela de features para forecasting
+  - Dados agregados diariamente por rota-veículo-período
+  - Inclui features de lag (dia anterior) e tendência (média móvel 7 dias)
+  - Pronta para uso em modelos de previsão ou análise de tendências no Power BI
+
+#### Como Utilizar no Power BI
+
+Conecte-se às tabelas de risco para criar dashboards de monitoramento:
+
+- **Visão Geral de Riscos**: Use `risk_route_analysis` e `risk_vehicle_analysis` para identificar os principais responsáveis por atrasos
+- **Análise Temporal**: Use `risk_temporal_patterns` para entender variações horárias e semanais
+- **Drivers Detalhados**: Use `risk_delay_drivers` para investigar combinações específicas de fatores
+- **Forecasting**: Use `risk_forecast_features` para analisar tendências e construir modelos preditivos
 
 #### Registro de Uso de Tokens
 **Localização**: `.claude/tokens.md`
@@ -278,7 +385,6 @@ python incremental_dbt_seed.py
    - Nome de usuário: `postgres`
    - Senha: (do arquivo `.env`)
 4. Principais tabelas para dashboard:
-   - `test_results`: Resultados consolidados de testes
-   - `fact_log_events`: Tabela fato principal
-   - `dim_endpoints`: Estatísticas por endpoint
-   - `dim_time_periods`: Agregações temporais
+    - **Core**: `fact_shipments`, `dim_routes`, `dim_vehicles`, `dim_incidents`
+    - **Risk Forecasting**: `risk_route_analysis`, `risk_vehicle_analysis`, `risk_temporal_patterns`, `risk_delay_drivers`, `risk_forecast_features`
+    - **Data Quality**: `test_registry` (catálogo de testes)

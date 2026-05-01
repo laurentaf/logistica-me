@@ -1,13 +1,13 @@
 {{ config(tags=['uniqueness', 'cross_file']) }}
 
-WITH all_logs AS (
-  SELECT log_id, COUNT(*) as file_count
-  FROM {{ ref('stg_raw_logs') }}
-  GROUP BY log_id
+WITH all_shipments AS (
+  SELECT shipment_id, COUNT(*) as file_count
+  FROM {{ ref('stg_shipments') }}
+  GROUP BY shipment_id
 )
 
 SELECT 
-  log_id,
+  shipment_id,
   file_count
-FROM all_logs
+FROM all_shipments
 WHERE file_count > 1

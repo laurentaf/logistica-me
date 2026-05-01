@@ -1,0 +1,46 @@
+test_name,test_type,phase,tool,metric,description,model_name
+stg_shipments_shipment_id_not_null,completeness,staging,dbt,shipment_id,"Validates shipment_id is not null",stg_shipments
+stg_shipments_shipment_id_unique,uniqueness,staging,dbt,shipment_id,"Validates shipment_id is unique",stg_shipments
+stg_shipments_event_timestamp_not_null,completeness,staging,dbt,event_timestamp,"Validates event_timestamp is not null",stg_shipments
+stg_shipments_route_id_not_null,completeness,marts,dbt,route_id,"Validates route_id foreign key is not null",fact_shipments
+stg_shipments_vehicle_id_not_null,completeness,marts,dbt,vehicle_id,"Validates vehicle_id foreign key is not null",fact_shipments
+stg_shipments_incident_id_not_null,completeness,marts,dbt,incident_id,"Validates incident_id foreign key is not null",fact_shipments
+stg_shipments_weight_kg_positive,accuracy,marts,dbt,weight_kg,"Validates weight_kg is positive",fact_shipments
+stg_shipments_is_on_time_validity,validity,marts,dbt,is_on_time,"Validates is_on_time is true or false",fact_shipments
+stg_shipments_is_delayed_validity,validity,marts,dbt,is_delayed,"Validates is_delayed is true or false",fact_shipments
+dim_routes_route_id_unique,uniqueness,dimension,dbt,route_id,"Validates route_id is unique",dim_routes
+dim_routes_origin_not_null,completeness,dimension,dbt,origin,"Validates origin is not null",dim_routes
+dim_routes_destination_not_null,completeness,dimension,dbt,destination,"Validates destination is not null",dim_routes
+dim_vehicles_vehicle_id_unique,uniqueness,dimension,dbt,vehicle_id,"Validates vehicle_id is unique",dim_vehicles
+dim_vehicles_vehicle_type_not_null,completeness,dimension,dbt,vehicle_type,"Validates vehicle_type is not null",dim_vehicles
+dim_incidents_incident_id_unique,uniqueness,dimension,dbt,incident_id,"Validates incident_id is unique",dim_incidents
+dim_incidents_delivery_status_not_null,completeness,dimension,dbt,delivery_status,"Validates delivery_status is not null",dim_incidents
+dim_incidents_delay_category_not_null,completeness,dimension,dbt,delay_category,"Validates delay_category is not null",dim_incidents
+dim_incidents_delay_category_accepted,validity,dimension,dbt,delay_category,"Validates delay_category is in accepted values",dim_incidents
+valid_timestamp_format,accuracy,staging,dbt,timestamp,"Validates timestamp format is ISO 8601",stg_shipments
+valid_weight_kg,accuracy,staging,dbt,weight_kg,"Validates weight_kg is numeric and non-negative",stg_shipments
+valid_delay_minutes,accuracy,staging,dbt,estimated_delay_minutes,"Validates estimated_delay_minutes is not null",stg_shipments
+timestamp_freshness,timeliness,staging,dbt,timestamp,"Validates timestamps are not excessively in the future",stg_shipments
+null_rate_analysis,completeness,staging,dbt,multiple,"Analyzes null rates across all columns",stg_shipments
+statistical_outlier_detection,accuracy,staging,dbt,weight_kg_delay,"Detects statistical outliers in weight and delay metrics",stg_shipments
+cross_file_duplicate_detection,uniqueness,staging,dbt,shipment_id,"Detects duplicate shipment_ids across files",stg_shipments
+data_freshness_score,timeliness,staging,dbt,timestamp,"Scores data freshness based on latest timestamp",stg_shipments
+# Fact table consistency tests (business rules)
+fact_shipments_estimated_delay_minutes_not_null,accuracy,marts,dbt,estimated_delay_minutes,"Validates estimated_delay_minutes is not null in fact table",fact_shipments
+fact_shipments_is_on_time_consistency,validity,marts,dbt,is_on_time,"Validates is_on_time is consistent with estimated_delay_minutes (true if <=0)",fact_shipments
+fact_shipments_is_delayed_consistency,validity,marts,dbt,is_delayed,"Validates is_delayed is consistent with estimated_delay_minutes (true if >0)",fact_shipments
+# Risk model tests
+risk_route_analysis_pct_delayed_range,accuracy,marts,dbt,pct_delayed,"Validates pct_delayed is between 0 and 100",risk_route_analysis
+risk_route_analysis_risk_score_range,accuracy,marts,dbt,risk_score,"Validates risk_score is between 0 and 100",risk_route_analysis
+risk_route_analysis_risk_category_valid,validity,marts,dbt,risk_category,"Validates risk_category is in HIGH, MEDIUM, LOW",risk_route_analysis
+risk_vehicle_analysis_pct_delayed_range,accuracy,marts,dbt,pct_delayed,"Validates pct_delayed is between 0 and 100",risk_vehicle_analysis
+risk_vehicle_analysis_risk_score_range,accuracy,marts,dbt,risk_score,"Validates risk_score is between 0 and 100",risk_vehicle_analysis
+risk_vehicle_analysis_risk_category_valid,validity,marts,dbt,risk_category,"Validates risk_category is in HIGH, MEDIUM, LOW",risk_vehicle_analysis
+risk_temporal_patterns_pct_delayed_range,accuracy,marts,dbt,pct_delayed,"Validates pct_delayed is between 0 and 100",risk_temporal_patterns
+risk_forecast_features_delay_rate_range,accuracy,marts,dbt,delay_rate_pct,"Validates delay_rate_pct is between 0 and 100",risk_forecast_features
+risk_forecast_features_heavy_shipment_range,accuracy,marts,dbt,heavy_shipment_pct,"Validates heavy_shipment_pct is between 0 and 100",risk_forecast_features
+risk_forecast_features_route_risk_score_range,accuracy,marts,dbt,route_risk_score,"Validates route_risk_score is between 0 and 100",risk_forecast_features
+risk_forecast_features_route_risk_category_valid,validity,marts,dbt,route_risk_category,"Validates route_risk_category is in HIGH, MEDIUM, LOW",risk_forecast_features
+risk_forecast_features_vehicle_risk_score_range,accuracy,marts,dbt,vehicle_risk_score,"Validates vehicle_risk_score is between 0 and 100",risk_forecast_features
+risk_forecast_features_vehicle_risk_category_valid,validity,marts,dbt,vehicle_risk_category,"Validates vehicle_risk_category is in HIGH, MEDIUM, LOW",risk_forecast_features
+risk_forecast_features_combined_risk_valid,validity,marts,dbt,combined_risk_level,"Validates combined_risk_level is in HIGH, MEDIUM, LOW",risk_forecast_features

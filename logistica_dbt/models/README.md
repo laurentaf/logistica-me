@@ -1,60 +1,61 @@
 # Data Models
 
 ## Staging Layer (`staging/`)
-- **`stg_raw_logs.sql`**: Cleans and transforms raw CSV data into structured format
-  - Converts timestamp strings to timestamp type
-  - Casts numeric fields (status_code, response_time_ms) to integers
+- **`stg_shipments.sql`**: Cleans and transforms raw CSV data into structured format
+  - Converts timestamp strings to timestamp type (`event_timestamp`)
+  - Casts numeric fields (`weight_kg`, `estimated_delay_minutes`) to appropriate types
   - Maintains all original columns with proper data types
 
 ## Marts Layer (`marts/`)
 ### Fact Tables
-- **`fact_log_events.sql`**: Main fact table with enhanced analytics columns
-  - Adds time dimensions (event_date, event_hour)
-  - Categorizes status codes (success, client_error, server_error, other)
-  - Categorizes response times (fast, medium, slow, very_slow)
-  - Includes all original log data with calculated fields
+- **`fact_shipments.sql`**: Main fact table with delay metrics
+  - Surrogate keys to dimensions: `route_id`, `vehicle_id`, `incident_id`
+  - Derived metrics: `is_on_time`, `is_delayed`
+  - Time conveniences: `event_date`, `event_hour`
+  - Includes all shipment data with calculated fields
 
 ### Dimension Tables
-- **`dim_endpoints.sql`**: Aggregated endpoint statistics
-  - Total requests per endpoint
-  - Response time statistics (avg, min, max)
-  - Success/error counts and rates
-  - Useful for endpoint performance analysis
-
-- **`dim_time_periods.sql`**: Hourly aggregated metrics
-  - Request counts per hour
-  - Average response times
-  - Success/error counts
-  - Success rate percentages
-  - Useful for time-based trend analysis
+- **`dim_routes.sql`**: Route dimension (origin-destination pairs)
+  - `route_id` surrogate key
+  - `origin`, `destination`, `route_name`
+- **`dim_vehicles.sql`**: Vehicle type dimension
+  - `vehicle_id` surrogate key
+  - `vehicle_type`
+- **`dim_incidents.sql`**: Incident dimension based on delivery status and delay category
+  - `incident_id` surrogate key
+  - `delivery_status`, `delay_category`, `is_on_time`, `is_delayed`, `incident_type`
 
 ## Data Flow
 ```
-CSV Files → stg_raw_logs → fact_log_events
-                              ↓
-                    dim_endpoints + dim_time_periods
+CSV Files → stg_shipments → fact_shipments
+                   ↓
+      dim_routes, dim_vehicles, dim_incidents
 ```
 
 ## Testing
 See `../tests/` directory for data quality tests including:
-- Unique log_id validation
-- Not null constraints
-- Valid status codes (100-599)
-- Positive response times
+- Unique `shipment_id` validation
+- Not null constraints on key columns
+- Valid weight (> 0)
+- Delay minutes not null
+- Timestamp freshness and format
+- Cross-file duplicate detection
+- Null rate analysis
+- Statistical outlier detection
 
 ## Column Reference
 ### Original CSV Columns
-- `log_id`: Unique identifier (UUID format)
+- `shipment_id`: Unique identifier (UUID format)
 - `timestamp`: Event timestamp (ISO 8601 format)
-- `ip_address`: Client IP address
-- `http_method`: HTTP method (GET, POST, PUT, DELETE, etc.)
-- `endpoint`: API endpoint path
-- `status_code`: HTTP status code (200, 404, 500, etc.)
-- `response_time_ms`: Response time in milliseconds
-- `user_agent`: Client user agent string
+- `origin`: Origin location
+- `destination`: Destination location
+- `weight_kg`: Weight in kilograms
+- `delivery_status`: Delivery status (e.g., DELIVERED, IN_TRANSIT)
+- `vehicle_type`: Type of vehicle
+- `estimated_delay_minutes`: Estimated delay in minutes (can be negative)
 
-### Calculated Fields (fact_log_events)
+### Calculated Fields (fact_shipments)
 - `event_date`: Date portion of timestamp
-- `event_hour`: Hour portion of timestamp  
-- `status_category`: Categorized status codes
-- `response_time_category`: Categorized response times
+- `event_hour`: Hour portion of timestamp
+- `is_on_time`: TRUE if delay ≤ 0
+- `is_delayed`: TRUE if delay > 0

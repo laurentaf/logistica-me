@@ -1,80 +1,77 @@
-{{
-  config(
+{{ config(
     materialized='table',
     tags=['test_results']
-  )
-}}
+) }}
 
 WITH test_executions AS (
+  -- Data Quality: Timestamp format
   SELECT 
     'data_quality' as test_category,
-    'valid_ip_address' as test_name,
+    'valid_timestamp_format' as test_name,
     COUNT(*) as failures,
-    'IP address format validation' as description
-  FROM {{ ref('valid_ip_address') }}
-  
-  UNION ALL
-  
-  SELECT 
-    'data_quality',
-    'valid_timestamp_format',
-    COUNT(*),
-    'Timestamp format validation'
+    'Timestamp format validation' as description
   FROM {{ ref('valid_timestamp_format') }}
   
   UNION ALL
   
+  -- Data Quality: Weight positivity
   SELECT 
-    'referential_integrity',
-    'foreign_key_integrity',
+    'data_quality',
+    'valid_weight_kg',
     COUNT(*),
-    'Foreign key relationship validation'
-  FROM {{ ref('foreign_key_integrity') }}
+    'Weight positivity validation (kg > 0)'
+  FROM {{ ref('valid_weight_kg') }}
   
   UNION ALL
   
+  -- Data Quality: Delay minutes not null
   SELECT 
-    'business_logic',
-    'response_time_thresholds',
+    'data_quality',
+    'valid_delay_minutes',
     COUNT(*),
-    'Response time SLA violations'
-  FROM {{ ref('response_time_thresholds') }}
+    'Delay minutes not null validation'
+  FROM {{ ref('valid_delay_minutes') }}
   
   UNION ALL
   
+  -- Uniqueness: Cross-file duplicate shipment IDs
+  SELECT 
+    'uniqueness',
+    'cross_file_duplicate_detection',
+    COUNT(*),
+    'Duplicate shipment_id across files'
+  FROM {{ ref('cross_file_duplicate_detection') }}
+  
+  UNION ALL
+  
+  -- Timeliness: Future timestamps
+  SELECT 
+    'timeliness',
+    'timestamp_freshness',
+    COUNT(*),
+    'Future timestamps detection'
+  FROM {{ ref('timestamp_freshness') }}
+  
+  UNION ALL
+  
+  -- Completeness: Null rate analysis
   SELECT 
     'completeness',
-    'data_completeness_endpoints',
+    'null_rate_analysis',
     COUNT(*),
-    'Low-volume endpoint detection'
-  FROM {{ ref('data_completeness_endpoints') }}
+    'Null rate exceeding 5% threshold'
+  FROM {{ ref('null_rate_analysis') }}
+  WHERE test_status = 'FAIL'
   
   UNION ALL
   
+  -- Accuracy: Statistical outlier detection
   SELECT 
-    'data_consistency',
-    'consistency_status_response_time',
+    'accuracy',
+    'statistical_outlier_detection',
     COUNT(*),
-    'Status code vs response time consistency'
-  FROM {{ ref('consistency_status_response_time') }}
-  
-  UNION ALL
-  
-  SELECT 
-    'data_quality',
-    'endpoint_pattern_consistency',
-    COUNT(*),
-    'Endpoint path format validation'
-  FROM {{ ref('endpoint_pattern_consistency') }}
-  
-  UNION ALL
-  
-  SELECT 
-    'data_quality',
-    'user_agent_format',
-    COUNT(*),
-    'User agent format validation'
-  FROM {{ ref('user_agent_format') }}
+    'Statistical outliers in weight or delay'
+  FROM {{ ref('statistical_outlier_detection') }}
 )
 
 SELECT 
