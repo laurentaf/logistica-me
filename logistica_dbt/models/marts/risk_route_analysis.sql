@@ -14,7 +14,7 @@ WITH route_stats AS (
         COUNT(*) FILTER (WHERE f.is_delayed = TRUE) AS delayed_shipments,
         COUNT(*) FILTER (WHERE f.is_on_time = TRUE) AS on_time_shipments,
         AVG(f.estimated_delay_minutes) AS avg_delay_minutes,
-        MEDIAN(f.estimated_delay_minutes) AS median_delay_minutes,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY f.estimated_delay_minutes) AS median_delay_minutes,
         MAX(f.estimated_delay_minutes) AS max_delay_minutes,
         STDDEV(f.estimated_delay_minutes) AS stddev_delay_minutes,
         PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY f.estimated_delay_minutes) AS q1_delay,

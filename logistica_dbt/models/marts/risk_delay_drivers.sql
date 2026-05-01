@@ -4,7 +4,7 @@
 -- Finds combinations of factors that contribute most to delays
 -- Analyzes interactions between route, vehicle type, and time patterns
 
-WITH shipment_ enriched AS (
+WITH shipment_enriched AS (
     SELECT
         f.shipment_id,
         f.estimated_delay_minutes,
@@ -54,7 +54,7 @@ route_vehicle_drivers AS (
             2
         ) AS delay_rate_pct,
         AVG(estimated_delay_minutes) AS avg_delay,
-        MEDIAN(estimated_delay_minutes) AS median_delay,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY estimated_delay_minutes) AS median_delay,
         MAX(estimated_delay_minutes) AS max_delay,
         'ROUTE_VEHICLE' AS driver_dimension
     FROM shipment_enriched
@@ -76,7 +76,7 @@ route_time_drivers AS (
             2
         ) AS delay_rate_pct,
         AVG(estimated_delay_minutes) AS avg_delay,
-        MEDIAN(estimated_delay_minutes) AS median_delay,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY estimated_delay_minutes) AS median_delay,
         MAX(estimated_delay_minutes) AS max_delay,
         'ROUTE_TIME' AS driver_dimension
     FROM shipment_enriched
@@ -98,7 +98,7 @@ vehicle_time_drivers AS (
             2
         ) AS delay_rate_pct,
         AVG(estimated_delay_minutes) AS avg_delay,
-        MEDIAN(estimated_delay_minutes) AS median_delay,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY estimated_delay_minutes) AS median_delay,
         MAX(estimated_delay_minutes) AS max_delay,
         'VEHICLE_TIME' AS driver_dimension
     FROM shipment_enriched
