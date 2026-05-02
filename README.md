@@ -33,7 +33,7 @@ Cada arquivo CSV contém remessas logísticas com as seguintes colunas:
 data/raw/                    # Dados brutos da API
   dataset_*.csv              # Arquivos CSV originais
   dataset_*_metadata.json    # Metadados de cada download
-  dataset_*_test_results.json # Resultados de testes de qualidade
+  dataset_*_test_results.json # Resultados de testes de qualidade (gerados por API.py)
   
 data/processed/              # Dados após limpeza e padronização
   dataset_*_processed.csv
@@ -91,8 +91,8 @@ docker-compose logs
 POSTGRES_USERNAME=postgres
 POSTGRES_PASSWORD=sua_senha_segura
 POSTGRES_HOST=localhost  # Para Docker no Windows
-POSTGRES_PORT=5432
-POSTGRES_DBNAME=logistica_db
+POSTGRES_PORT=numero_da_porta
+POSTGRES_DBNAME=nome_do_db
 ```
 
 **Arquivo profiles.yml** (~/.dbt/profiles.yml):
@@ -102,11 +102,11 @@ logistica_dbt:
   outputs:
     dev:
       type: postgres
-      host: localhost          # Docker PostgreSQL no Windows
+      host: ${POSTGRES_HOST}  # Docker PostgreSQL no Windows, default: localhost
       user: ${POSTGRES_USERNAME}
       pass: ${POSTGRES_PASSWORD}
-      port: 5432
-      dbname: logistica_db
+      port: ${POSTGRES_PORT}
+      dbname: ${POSTGRES_DBNAME}
       schema: raw
       threads: 4
 ```
@@ -162,7 +162,7 @@ A tabela `test_registry` estará disponível no PostgreSQL e pode ser utilizada 
 
 **Conexão**:
 - Usar conector nativo PostgreSQL do Power BI
-- Conectar a `localhost:5432` (PostgreSQL Docker)
+- Conectar a `${POSTGRES_HOST}:${POSTGRES_PORT}` (PostgreSQL Docker)
 - Principais tabelas para dashboard:
   - `fact_shipments`: Fatos de remessas com métricas de atraso
   - `dim_routes`, `dim_vehicles`, `dim_incidents`: Dimensões para slicing/dicing
@@ -227,38 +227,63 @@ API (download) → data/raw → Limpeza → data/processed → dbt seed → Post
 ```
 
 #### Scripts do Pipeline
-1. **`API.py`** - Download de dados da API
+
+| Script | Descrição | Como usar |
+|--------|-----------|-----------|
+| `API.py` | Download incremental da API + testes de qualidade | `python API.py --count 5` |
+| `data_processing_pipeline.py` | Limpeza e padronização dos dados brutos | `python data_processing_pipeline.py` |
+| `incremental_dbt_seed.py` | Carga incremental no PostgreSQL via dbt seed | `python incremental_dbt_seed.py` |
+| `test_e2e_pipeline.py` | Teste completo do pipeline end-to-end | `python test_e2e_pipeline.py` |
+| `preview_models.py` | Visualização dos schemas dos modelos dbt | `python preview_models.py` |
+| `install_dbt.py` | Instalação do dbt-core + dbt-postgres + dbt_utils | `python install_dbt.py` |
+
+#### Detalhamento dos Scripts
+
+1. **`API.py`** - Download de dados da API com testes de qualidade integrados
    ```bash
-   python API.py
+   python API.py --count 5
    ```
-   - Baixa dados da API para `data/raw/`
-   - Cada execução gera novos arquivos
-   - Executa testes básicos de consistência
+   - Baixa dados incrementais da API para `data/raw/` (opções: `--count N`, `--start N`)
+   - Gera metadados JSON para cada arquivo baixado
+   - Executa testes de qualidade de dados (colunas, schema, contagem de linhas)
+   - Gera relatório de conformidade (100% para dados válidos)
+   - Suporta detecção automática de sequência incremental
 
-2. **`API.py`** - Testes de qualidade integrados
+2. **`data_processing_pipeline.py`** - Pipeline de processamento e limpeza
    ```bash
-   python API.py
+   python data_processing_pipeline.py
    ```
-   - Baixa dados da API para `data/raw/`
-   - Cada execução gera novos arquivos
-   - Executa testes básicos de consistência
-   - Valida estrutura de todos os arquivos CSV
-   - Verifica conformidade com schema esperado
+   - Limpa dados brutos: timestamp, weight_kg, estimated_delay_minutes
+   - Normaliza textos (delivery_status, vehicle_type)
+   - Salva versão processada em `data/processed/`
+   - Gera relatórios de limpeza JSON por arquivo
 
-3. **`data_processing_pipeline.py`** - Pipeline completo
-     ```bash
-     python data_processing_pipeline.py
-     ```
-     - Limpa dados brutos (timestamp, weight_kg, estimated_delay_minutes, normaliza textos)
-     - Salva versão limpa em `data/processed/`
-     - Não faz seededb (use `incremental_dbt_seed.py`)
+3. **`incremental_dbt_seed.py`** - Carga incremental no PostgreSQL
+   ```bash
+   python incremental_dbt_seed.py
+   ```
+   - Copia apenas arquivos novos para `logistica_dbt/seeds/`
+   - Renomeia seeds para `shipments_XXXXX.csv`
+   - Rastreia estado via `config/seed_state.json`
+   - Executa `dbt seed --select` apenas para novos arquivos
 
-4. **`dbt`** - Transformação e carga
+4. **`test_e2e_pipeline.py`** - Validação completa do pipeline
+   ```bash
+   python test_e2e_pipeline.py
+   ```
+   - Executa todas as etapas do pipeline em sequência
+   - Reporta status colorido de cada etapa (PASS/FAIL)
+   - Inclui verificação de dependências (Python, dbt)
+   - Verifica existência de todas as tabelas no banco de dados
+   - Reporta contagem de linhas das tabelas principais
+
+5. **`dbt`** - Transformação e carga
    ```bash
    cd logistica_dbt
-   dbt seed    # Carrega dados processados (shipments_*.csv) para PostgreSQL
-   dbt run     # Executa staging → dims/fact
-   dbt test    # Executa testes de qualidade
+   dbt deps --profiles-dir .   # Instalar dependências dbt (dbt_utils)
+   dbt seed --profiles-dir .   # Carrega dados processados (shipments_*.csv) para PostgreSQL
+   dbt run --profiles-dir .    # Executa staging → dims/fact
+   dbt test --profiles-dir .   # Executa testes de qualidade
    ```
 
 #### Setup Inicial (Windows com Docker)
@@ -277,8 +302,11 @@ python install_dbt.py
 ```
    - O projeto já inclui `.venv-dbt/` (crie se não existir)
    - O `dbt` precisa estar no PATH ou ativo no venv
-3. **Instalar outras dependências Python**:
+3. **Instalar dependências Python**:
 ```bash
+# Instalar dependências do projeto
+pip install pandas numpy python-dotenv requests psycopg2-binary
+# OU via requirements.txt
 pip install -r requirements.txt
 ```
 3. **Configurar ambiente**:
@@ -372,28 +400,30 @@ Conecte-se às tabelas de risco para criar dashboards de monitoramento:
 - **Drivers Detalhados**: Use `risk_delay_drivers` para investigar combinações específicas de fatores
 - **Forecasting**: Use `risk_forecast_features` para analisar tendências e construir modelos preditivos
 
-#### Registro de Uso de Tokens
-**Localização**: `.claude/tokens.md`
-```markdown
-# Token Usage Log
-| Date | Operation | Tokens Used |
-|------|-----------|-------------|
-| 2026-04-18 | Download dataset_2 + comparison | ~2,500 |
-| 2026-04-18 | Delete datasets, API CSV, dbt setup | ~3,200 |
-| 2026-04-18 | Create incremental token script | 800 |
-```
-
-**OBSERVAÇÃO**: Todo uso de tokens da API deve ser registrado neste arquivo.
+#### Registro de Uso de IA
+O arquivo `.claude/memory.md` contém o contexto do projeto para assistentes de IA, incluindo:
+- Schema de dados e estrutura do projeto
+- Regras de segurança (nunca ler `.env`, usar `.env.example`)
+- Configuração do ambiente dbt e fluxo de dados
+- Diretrizes de operação para LLMs
 
 #### Conexão Power BI
 1. Abrir Power BI Desktop
 2. Obter Dados → PostgreSQL
 3. Configurar conexão:
-   - Servidor: `localhost`
-   - Banco de dados: `logistica_db`
-   - Nome de usuário: `postgres`
-   - Senha: (do arquivo `.env`)
+   - Servidor: ${POSTGRES_HOST}
+   - Banco de dados: ${POSTGRES_DBNAME}
+   - Nome de usuário: ${POSTGRES_USERNAME}
+   - Senha: ${POSTGRES_PASSWORD}
 4. Principais tabelas para dashboard:
     - **Core**: `fact_shipments`, `dim_routes`, `dim_vehicles`, `dim_incidents`
     - **Risk Forecasting**: `risk_route_analysis`, `risk_vehicle_analysis`, `risk_temporal_patterns`, `risk_delay_drivers`, `risk_forecast_features`
     - **Data Quality**: `test_registry` (catálogo de testes)
+
+#### Configuração do Projeto
+- `requirements.txt` - Dependências Python (pandas, numpy, python-dotenv, requests, psycopg2-binary)
+- `pyproject.toml` - Metadados do projeto e configuração de build (Python >=3.11)
+- `install_dbt.py` - Script para instalar dbt-core + dbt-postgres + dbt_utils em `.venv-dbt`
+- `preview_models.py` - Visualizar schema de todos os modelos dbt sem conexão ao banco
+- `show_all_models.sql` - SQL para visualizar dados de todas as tabelas do modelo
+- `EXAMPLE_OUTPUT.md` - Exemplos de saída do pipeline
