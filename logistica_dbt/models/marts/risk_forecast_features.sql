@@ -122,10 +122,10 @@ SELECT
     total_shipments,
     delayed_shipments,
     on_time_shipments,
-    ROUND(avg_delay_minutes, 2) AS avg_delay_minutes,
-    ROUND(median_delay_minutes, 2) AS median_delay_minutes,
+    ROUND(avg_delay_minutes::numeric, 2) AS avg_delay_minutes,
+    ROUND(median_delay_minutes::numeric, 2) AS median_delay_minutes,
     max_delay_minutes,
-    ROUND(stddev_delay_minutes, 2) AS stddev_delay_minutes,
+    ROUND(stddev_delay_minutes::numeric, 2) AS stddev_delay_minutes,
     q1_delay,
     q3_delay,
     delay_rate_pct,
@@ -140,9 +140,9 @@ SELECT
     prev_day_shipments,
     prev_day_avg_delay,
     prev_day_delay_rate,
-    ROUND(moving_avg_7day_delay, 2) AS moving_avg_7day_delay,
-    ROUND(moving_avg_7day_delay_rate, 2) AS moving_avg_7day_delay_rate,
-    ROUND(delay_change_from_prev_day, 2) AS delay_change_from_prev_day,
-    ROUND(delay_rate_change_from_prev_day, 2) AS delay_rate_change_from_prev_day
+    ROUND(moving_avg_7day_delay::numeric, 2) AS moving_avg_7day_delay,
+    ROUND(moving_avg_7day_delay_rate::numeric, 2) AS moving_avg_7day_delay_rate,
+    ROUND(delay_change_from_prev_day::numeric, 2) AS delay_change_from_prev_day,
+    ROUND(delay_rate_change_from_prev_day::numeric, 2) AS delay_rate_change_from_prev_day
 FROM with_risk_scores
 ORDER BY event_date DESC, route_id, vehicle_id, time_of_day_bucket

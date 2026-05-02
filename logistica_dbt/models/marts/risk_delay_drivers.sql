@@ -194,8 +194,8 @@ SELECT
     total_shipments,
     delayed_shipments,
     delay_rate_pct,
-    ROUND(avg_delay, 2) AS avg_delay,
-    ROUND(median_delay, 2) AS median_delay,
+    ROUND(avg_delay::numeric, 2) AS avg_delay,
+    ROUND(median_delay::numeric, 2) AS median_delay,
     max_delay,
     driver_dimension
 FROM route_vehicle_drivers
@@ -214,8 +214,8 @@ SELECT
     total_shipments,
     delayed_shipments,
     delay_rate_pct,
-    ROUND(avg_delay, 2) AS avg_delay,
-    ROUND(median_delay, 2) AS median_delay,
+    ROUND(avg_delay::numeric, 2) AS avg_delay,
+    ROUND(median_delay::numeric, 2) AS median_delay,
     max_delay,
     driver_dimension
 FROM route_time_drivers
@@ -234,8 +234,8 @@ SELECT
     total_shipments,
     delayed_shipments,
     delay_rate_pct,
-    ROUND(avg_delay, 2) AS avg_delay,
-    ROUND(median_delay, 2) AS median_delay,
+    ROUND(avg_delay::numeric, 2) AS avg_delay,
+    ROUND(median_delay::numeric, 2) AS median_delay,
     max_delay,
     driver_dimension
 FROM vehicle_time_drivers
@@ -274,7 +274,7 @@ SELECT
     total_shipments_affected AS total_shipments,
     NULL::INTEGER AS delayed_shipments,
     delay_rate_pct,
-    ROUND(avg_delay, 2) AS avg_delay,
+    ROUND(avg_delay::numeric, 2) AS avg_delay,
     NULL::INTEGER AS median_delay,
     NULL::INTEGER AS max_delay,
     'OVERALL_SUMMARY' AS driver_dimension

@@ -45,7 +45,7 @@ WITH vehicle_stats AS (
             2
         ) AS pct_heavy_shipments,
         -- Time patterns: average delay by hour of day
-        DATE_PART('hour', f.event_timestamp) AS avg_event_hour
+        AVG(DATE_PART('hour', f.event_timestamp)) AS avg_event_hour
     FROM {{ ref('fact_shipments') }} f
     LEFT JOIN {{ ref('dim_vehicles') }} v ON f.vehicle_id = v.vehicle_id
     GROUP BY
@@ -60,18 +60,18 @@ SELECT
     total_shipments,
     delayed_shipments,
     on_time_shipments,
-    ROUND(avg_delay_minutes, 2) AS avg_delay_minutes,
-    ROUND(median_delay_minutes, 2) AS median_delay_minutes,
+    ROUND(avg_delay_minutes::numeric, 2) AS avg_delay_minutes,
+    ROUND(median_delay_minutes::numeric, 2) AS median_delay_minutes,
     max_delay_minutes,
-    ROUND(stddev_delay_minutes, 2) AS stddev_delay_minutes,
+    ROUND(stddev_delay_minutes::numeric, 2) AS stddev_delay_minutes,
     q1_delay,
     q3_delay,
     pct_delayed,
-    ROUND(risk_score, 2) AS risk_score,
+    ROUND(risk_score::numeric, 2) AS risk_score,
     risk_category,
-    ROUND(avg_weight_kg, 2) AS avg_weight_kg,
-    ROUND(median_weight_kg, 2) AS median_weight_kg,
+    ROUND(avg_weight_kg::numeric, 2) AS avg_weight_kg,
+    ROUND(median_weight_kg::numeric, 2) AS median_weight_kg,
     heavy_shipments_count,
     pct_heavy_shipments,
-    ROUND(avg_event_hour, 2) AS avg_event_hour
+    ROUND(avg_event_hour::numeric, 2) AS avg_event_hour
 FROM vehicle_stats

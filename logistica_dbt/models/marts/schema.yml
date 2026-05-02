@@ -99,7 +99,7 @@ models:
         tests:
           - not_null
       - name: route_name
-        description: Nome formatado da rota (ex: "Cidade A → Cidade B")
+        description: "Nome formatado da rota (ex: 'Cidade A → Cidade B')"
 
   - name: dim_vehicles
     description: Dimensão de tipos de veículo
@@ -123,7 +123,7 @@ models:
           - unique
           - not_null
       - name: delivery_status
-        description: Status da entrega (ex: DELIVERED, IN_TRANSIT)
+        description: "Status da entrega (ex: DELIVERED, IN_TRANSIT)"
         tests:
           - not_null
       - name: delay_category
@@ -137,7 +137,7 @@ models:
       - name: is_delayed
         description: Flag se o incidente representa atraso
       - name: incident_type
-        description: Tipo combinado de status e atraso (ex: "DELIVERED - MINOR_DELAY")
+        description: 'Tipo combinado de status e atraso (ex: "DELIVERED - MINOR_DELAY")'
 
   # RISK ANALYSIS & FORECAST MODELS
   - name: risk_route_analysis
@@ -289,9 +289,9 @@ models:
       - name: vehicle_type
         description: Tipo de veículo (quando aplicável)
       - name: secondary_factor
-        description: Fator secundário (ex: time_of_day, weight_category)
+        description: "Fator secundário (ex: time_of_day, weight_category)"
       - name: tertiary_factor
-        description: Fator terciário (ex: weekday_weekend, delay_category)
+        description: "Fator terciário (ex: weekday_weekend, delay_category)"
       - name: total_shipments
         description: Total de remessas na combinação
       - name: delayed_shipments

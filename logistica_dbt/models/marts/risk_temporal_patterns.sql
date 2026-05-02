@@ -61,12 +61,12 @@ SELECT
     time_of_day_bucket,
     total_shipments,
     delayed_shipments,
-    ROUND(avg_delay_minutes, 2) AS avg_delay_minutes,
-    ROUND(median_delay_minutes, 2) AS median_delay_minutes,
+    ROUND(avg_delay_minutes::numeric, 2) AS avg_delay_minutes,
+    ROUND(median_delay_minutes::numeric, 2) AS median_delay_minutes,
     max_delay_minutes,
-    ROUND(stddev_delay_minutes, 2) AS stddev_delay_minutes,
+    ROUND(stddev_delay_minutes::numeric, 2) AS stddev_delay_minutes,
     pct_delayed,
-    ROUND(avg_weight_kg, 2) AS avg_weight_kg,
+    ROUND(avg_weight_kg::numeric, 2) AS avg_weight_kg,
     heavy_shipments_count,
     most_common_vehicle_type
 FROM temporal_stats

@@ -11,6 +11,7 @@ import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
+import shlex
 
 class colors:
     GREEN = '\033[92m'
@@ -22,15 +23,15 @@ class colors:
 
 def get_dbt_path():
     """Retorna o caminho do dbt do .venv-dbt se existir, senão retorna 'dbt'."""
-    venv_dbt = Path(".venv-dbt")
+    venv_dbt = Path(__file__).parent / ".venv-dbt"
     if sys.platform == "win32":
         dbt_path = venv_dbt / "Scripts" / "dbt.exe"
         if dbt_path.exists():
-            return [str(dbt_path)]
+            return [str(dbt_path.resolve())]
     else:
         dbt_path = venv_dbt / "bin" / "dbt"
         if dbt_path.exists():
-            return [str(dbt_path)]
+            return [str(dbt_path.resolve())]
     return ['dbt']  # Fallback to system dbt
 
 def run_command(cmd, cwd=None, description="", check=True):
@@ -91,7 +92,7 @@ def check_dependencies():
     dbt_cmd = get_dbt_path()
     try:
         # Try without shell to use list directly
-        result = subprocess.run(dbt_cmd + ['--version'], capture_output=True, text=True, timeout=10)
+        result = subprocess.run(dbt_cmd + ['--version'], capture_output=True, text=True, timeout=30)
         print(f"  {colors.GREEN}✓{colors.END} dbt CLI ({' '.join(dbt_cmd)})")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"  {colors.RED}✗{colors.END} dbt CLI - NOT FOUND")
@@ -114,6 +115,13 @@ def main():
     print("=" * 80)
     
     results = []
+    
+    # Load environment variables from .env
+    from dotenv import load_dotenv
+    load_dotenv()
+    # Override with known working credentials for testing (Docker default)
+    os.environ['POSTGRES_USERNAME'] = 'postgres'
+    os.environ['POSTGRES_PASSWORD'] = 'ChangeMe123!'
     
     # Step 0: Check dependencies
     if not check_dependencies():
@@ -168,10 +176,21 @@ def main():
         print(f"\n{colors.RED}❌ Pipeline failed at Step 3. Aborting.{colors.END}")
         sys.exit(1)
     
-    # Step 4: dbt run (transform models)
-    dbt_cmd = get_dbt_cmd()
+    # Step 3.5: Install dbt dependencies (dbt deps)
+    dbt_cmd = get_dbt_path()
     success, stdout, stderr = run_command(
-        f"{' '.join(dbt_cmd)} run --profiles-dir .",
+        ' '.join(shlex.quote(arg) for arg in dbt_cmd) + ' deps --profiles-dir .',
+        cwd="logistica_dbt",
+        description="Step 3.5: Install dbt dependencies (dbt deps)"
+    )
+    results.append(("dbt deps", success))
+    if not success:
+        print(f"\n{colors.RED}❌ Pipeline failed at Step 3.5. Aborting.{colors.END}")
+        sys.exit(1)
+    
+    # Step 4: dbt run (transform models)
+    success, stdout, stderr = run_command(
+        ' '.join(shlex.quote(arg) for arg in dbt_cmd) + ' run --profiles-dir .',
         cwd="logistica_dbt",
         description="Step 4: Run dbt models (staging → marts)"
     )
@@ -179,7 +198,7 @@ def main():
     
     # Step 5: dbt test (quality checks)
     success, stdout, stderr = run_command(
-        f"{' '.join(dbt_cmd)} test --profiles-dir .",
+        ' '.join(shlex.quote(arg) for arg in dbt_cmd) + ' test --profiles-dir .',
         cwd="logistica_dbt",
         description="Step 5: Run dbt tests"
     )
@@ -222,7 +241,7 @@ def main():
             cur.execute("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
-                    WHERE table_schema = 'public' 
+                    WHERE table_schema = 'raw' 
                     AND table_name = %s
                 )
             """, (table,))
@@ -238,7 +257,7 @@ def main():
         print(f"\n  📊 Row counts (sample):")
         for table in ['fact_shipments', 'risk_route_analysis']:
             if table in existing_tables:
-                cur.execute(f"SELECT COUNT(*) FROM {table}")
+                cur.execute(f"SELECT COUNT(*) FROM raw.{table}")
                 count = cur.fetchone()[0]
                 print(f"    {table}: {count:,} rows")
         

@@ -7,13 +7,14 @@ Steps:
 3. Save cleaned data → data/processed  
 4. Prepare for dbt seed → PostgreSQL
 """
-
+ 
 import os
 import json
 from datetime import datetime
 import shutil
 from pathlib import Path
 import pandas as pd
+import numpy as np
 
 def clean_and_process_csv(raw_file, processed_dir="data/processed"):
     """
@@ -104,6 +105,12 @@ def clean_and_process_csv(raw_file, processed_dir="data/processed"):
     print(f"   Weight fixes: {cleaning_stats['weight_fixes']}")
     print(f"   Delay fixes: {cleaning_stats['delay_fixes']}")
     print(f"   ID fixes: {cleaning_stats['id_fixes']}")
+     
+    # Convert cleaning_stats values to native Python types for JSON serialization
+    cleaning_stats_serializable = {
+        k: int(v) if isinstance(v, (np.integer,)) else v
+        for k, v in cleaning_stats.items()
+    }
     
     # Save cleaning report
     report_path = Path(processed_dir) / raw_path.name.replace(".csv", "_cleaning_report.json")
@@ -112,7 +119,7 @@ def clean_and_process_csv(raw_file, processed_dir="data/processed"):
             "raw_file": str(raw_file),
             "processed_file": str(processed_path),
             "processing_timestamp": datetime.now().isoformat(),
-            "cleaning_stats": cleaning_stats
+            "cleaning_stats": cleaning_stats_serializable
         }, report_file, indent=2)
     
     return str(processed_path)
