@@ -1,5 +1,8 @@
 {
   "permissions": {
+    "deny": [
+      "Read(.env)"
+    ],
     "allow": [
       "Bash(git add *)",
       "Bash(git commit *)",

@@ -133,31 +133,32 @@ if os.path.exists(csv_file):
             
             # Store column information with data types
             column_info = []
+            descriptions = {{
+                "shipment_id": "Unique identifier (UUID format)",
+                "timestamp": "Event timestamp in ISO 8601 format (YYYY-MM-DDTHH:MM:SS.ssssss)",
+                "origin": "Origin location of the shipment",
+                "destination": "Destination location of the shipment",
+                "weight_kg": "Weight of the shipment in kilograms (float)",
+                "delivery_status": "Current delivery status (string)",
+                "vehicle_type": "Type of vehicle used for transportation",
+                "estimated_delay_minutes": "Estimated delay in minutes (integer, can be negative for early delivery)"
+            }}
             for i, header in enumerate(headers):
-                 data_type = "string"  # Default
-                 if header == 'shipment_id':
-                     data_type = "uuid"
-                 elif header == 'timestamp':
-                     data_type = "iso8601_datetime"
-                 elif header == 'weight_kg':
-                     data_type = "float"
-                 elif header == 'estimated_delay_minutes':
-                     data_type = "integer"
-                
+                data_type = "string" # Default
+                if header == 'shipment_id':
+                    data_type = "uuid"
+                elif header == 'timestamp':
+                    data_type = "iso8601_datetime"
+                elif header == 'weight_kg':
+                    data_type = "float"
+                elif header == 'estimated_delay_minutes':
+                    data_type = "integer"
+
                 column_info.append({{
                     "name": header,
                     "position": i + 1,
                     "expected_type": data_type,
-                        "description": {{
-                            "shipment_id": "Unique identifier (UUID format)",
-                            "timestamp": "Event timestamp in ISO 8601 format (YYYY-MM-DDTHH:MM:SS.ssssss)",
-                            "origin": "Origin location of the shipment",
-                            "destination": "Destination location of the shipment",
-                            "weight_kg": "Weight of the shipment in kilograms (float)",
-                            "delivery_status": "Current delivery status (string)",
-                            "vehicle_type": "Type of vehicle used for transportation",
-                            "estimated_delay_minutes": "Estimated delay in minutes (integer, can be negative for early delivery)"
-                        }}[header]
+                    "description": descriptions.get(header, "")
                 }})
             
             test_results["columns"] = column_info

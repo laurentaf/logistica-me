@@ -120,6 +120,9 @@ def main():
     from dotenv import load_dotenv
     load_dotenv()
     # Override with known working credentials for testing (Docker default)
+    os.environ['POSTGRES_HOST'] = 'localhost'
+    os.environ['POSTGRES_PORT'] = '5432'
+    os.environ['POSTGRES_DBNAME'] = 'logistica_db'
     os.environ['POSTGRES_USERNAME'] = 'postgres'
     os.environ['POSTGRES_PASSWORD'] = 'ChangeMe123!'
     

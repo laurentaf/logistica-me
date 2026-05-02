@@ -1,40 +1,51 @@
 # Project Memory - Logistica-ME
 
 ## Environment
-- **Python venv path:** `.venv/Scripts/python.exe` (THIS PROJECT ONLY - always use this)
-- **Language:** Python 3.11
-- **Use venv for:** ALL Python operations in this project (never system python)
+- **Python venv path:** `.venv/` (Windows) or system python3 (Linux)
+- **dbt venv path:** `.venv-dbt/bin/dbt` (Linux) or `.venv-dbt/Scripts/dbt.exe` (Windows)
+- **Language:** Python 3.12+
 
-## Project Files
-- **API.py:** Downloads dataset from datamission API (requires .env with API_KEY_DATASET)
-- **Dataset file:** `dataset_b3884914-82a8-45c9-9c56-f37e87f45077.parquet`
-- **Environment:** `.env` (contains API_KEY_DATASET token)
+## CRITICAL: SECURITY RULES
+- **NEVER READ `.env` FILE** - It contains production secrets. Always use `.env.example` to understand the required environment variable schema.
+- `.env` contains: `API_KEY_DATASET`, `API_KEY_NVIDIA`, `API_KEY_OPENROUTER`, `POSTGRES_USERNAME`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DBNAME`.
+- The schema and valid structure are in `.env.example` - use that file exclusively to understand what env vars are needed.
+- **DO NOT** log, output, or echo the contents of `.env` in any command or response.
+
+## Project Structure
+- **API.py:** Downloads incremental CSV datasets from DataMission API
+- **data_processing_pipeline.py:** Cleans and processes raw CSV data with pandas
+- **incremental_dbt_seed.py:** Copies processed files to dbt seeds, runs incremental dbt seed
+- **test_e2e_pipeline.py:** Full end-to-end pipeline test (API to process to seed to dbt run to dbt test to DB verify)
+- **install_dbt.py:** Installs dbt-core, dbt-postgres, dbt-utils into `.venv-dbt`
+- **preview_models.py:** Prints all dbt model schemas without DB connection
 
 ## Dataset Schema
-- log_id (uuid)
-- timestamp (datetime)
-- ip_address
-- http_method (GET, POST, DELETE, etc)
-- endpoint
-- status_code (200, 400, 500, 401, etc)
-- response_time_ms
-- user_agent
+- **shipment_id** (uuid): Unique identifier
+- **timestamp** (iso8601_datetime): Event timestamp
+- **origin** (string): Shipment origin location
+- **destination** (string): Shipment destination location
+- **weight_kg** (float): Weight of shipment in kilograms
+- **delivery_status** (string): Current delivery status
+- **vehicle_type** (string): Type of vehicle used
+- **estimated_delay_minutes** (integer): Estimated delay in minutes (can be negative)
 
-## Token Usage Tracking
-- **Requirement:** Always track token usage per session/conversation
-- **Method:** I (Claude) should report tokens used after every operations in a file 'tokens.md'
-- **CRITICAL:** NEVER skip token registration in tokens.md - this is mandatory for every operation
-- **Note:** Two datasets exist: `dataset.parquet` (10k rows) and `dataset_b388...parquet` (1k rows) - different data
-
-## Claude Guidelines (Do's and Don'ts)
-- **DON'T:** Send full database content for evaluation online
-- **DO:** Use quick Python script to extract schema + max 5 sample rows only
-- **Example:** `python -c "import pandas as pd; df = pd.read_csv('file.csv'); print(df.head(5).to_string())"`
-
-## Project Notes
-- `.venv` created by user on 2025-04-12 with Python 3.11.9
+## Data Flow
+1. `API.py` -> `data/raw/` (CSV + metadata JSON + test results JSON)
+2. `data_processing_pipeline.py` -> `data/processed/` (processed CSV + cleaning report JSON)
+3. `incremental_dbt_seed.py` -> `logistica_dbt/seeds/` (renamed CSVs) -> PostgreSQL (dbt seed)
+4. `dbt run` -> PostgreSQL views (staging -> marts models)
+5. `dbt test` -> Quality validation
 
 ## dbt Configuration
-- **dbt venv:** `.venv-dbt/Scripts/dbt.exe`
+- **dbt venv:** `.venv-dbt/`
 - **dbt project:** `logistica_dbt/`
-- **Download format:** CSV (5 incremental files: dataset_{project_id}_1.csv to _5.csv)
+- **Profiles dir:** Project root (uses `--profiles-dir .`)
+- **Database:** PostgreSQL (Docker or local)
+- **Models:** stg_shipments, fact_shipments, dim_routes, dim_vehicles, dim_incidents, risk_route/vehicle/temporal/delay_drivers/forecast analysis
+
+## Claude Guidelines
+- **DON'T:** Read or expose `.env` file contents ever
+- **DON'T:** Send secrets, API keys, or database credentials online
+- **DO:** Use `.env.example` to understand required environment variables
+- **DO:** Use `python3` on Linux, `.venv/Scripts/python.exe` on Windows
+- **DO:** Run `test_e2e_pipeline.py` before reporting pipeline health
