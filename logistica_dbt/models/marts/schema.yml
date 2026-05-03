@@ -23,6 +23,11 @@ models:
   # CORE FACT & DIMENSIONS
   - name: fact_shipments
     description: Tabela fato de remessas logísticas com métricas de atraso e dimensões de rotas, veículos e incidentes
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "(estimated_delay_minutes <= 0 AND is_on_time = true) OR (estimated_delay_minutes > 0 AND is_on_time = false)"
+      - dbt_utils.expression_is_true:
+          expression: "(estimated_delay_minutes > 0 AND is_delayed = true) OR (estimated_delay_minutes <= 0 AND is_delayed = false)"
     columns:
       - name: shipment_id
         description: Identificador único da remessa
@@ -61,22 +66,17 @@ models:
       - name: estimated_delay_minutes
         description: Atraso estimado em minutos
         tests:
-          - dbt_utils.expression_is_true:
-              expression: "estimated_delay_minutes IS NOT NULL"
+          - not_null
       - name: is_on_time
         description: Flag se a remessa chegou no prazo (atraso <= 0). Deve ser consistente com is_delayed e estimated_delay_minutes.
         tests:
           - accepted_values:
               values: [true, false]
-          - dbt_utils.expression_is_true:
-              expression: "(estimated_delay_minutes <= 0 AND is_on_time = true) OR (estimated_delay_minutes > 0 AND is_on_time = false)"
       - name: is_delayed
         description: Flag se a remessa está atrasada (atraso > 0). Deve ser consistente com is_on_time e estimated_delay_minutes.
         tests:
           - accepted_values:
               values: [true, false]
-          - dbt_utils.expression_is_true:
-              expression: "(estimated_delay_minutes > 0 AND is_delayed = true) OR (estimated_delay_minutes <= 0 AND is_delayed = false)"
       - name: event_date
         description: Data do evento (truncada para dia)
       - name: event_hour
@@ -142,6 +142,11 @@ models:
   # RISK ANALYSIS & FORECAST MODELS
   - name: risk_route_analysis
     description: Análise de risco por rota - identifica rotas com maiores taxas e valores de atraso, calcula score de risco
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "pct_delayed >= 0 AND pct_delayed <= 100"
+      - dbt_utils.expression_is_true:
+          expression: "risk_score >= 0 AND risk_score <= 100"
     columns:
       - name: route_id
         description: Chave da rota
@@ -175,14 +180,8 @@ models:
         description: Terceiro quartil dos atrasos (75%)
       - name: pct_delayed
         description: Percentual de remessas atrasadas
-        tests:
-          - dbt_utils.expression_is_true:
-              expression: "pct_delayed >= 0 AND pct_delayed <= 100"
       - name: risk_score
         description: Score de risco de 0 a 100 (combinado avg delay e % delayed)
-        tests:
-          - dbt_utils.expression_is_true:
-              expression: "risk_score >= 0 AND risk_score <= 100"
       - name: risk_category
         description: Categoria de risco (HIGH, MEDIUM, LOW) baseada no score
         tests:
@@ -191,6 +190,11 @@ models:
 
   - name: risk_vehicle_analysis
     description: Análise de risco por tipo de veículo - identifica veículos com maior propensão a atrasos
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "pct_delayed >= 0 AND pct_delayed <= 100"
+      - dbt_utils.expression_is_true:
+          expression: "risk_score >= 0 AND risk_score <= 100"
     columns:
       - name: vehicle_id
         description: Chave do veículo
@@ -220,14 +224,8 @@ models:
         description: Terceiro quartil
       - name: pct_delayed
         description: Percentual de atrasos por veículo
-        tests:
-          - dbt_utils.expression_is_true:
-              expression: "pct_delayed >= 0 AND pct_delayed <= 100"
       - name: risk_score
         description: Score de risco do veículo (0-100)
-        tests:
-          - dbt_utils.expression_is_true:
-              expression: "risk_score >= 0 AND risk_score <= 100"
       - name: risk_category
         description: Categoria de risco do veículo
         tests:
@@ -236,6 +234,9 @@ models:
 
   - name: risk_temporal_patterns
     description: Análise de padrões temporais de atrasos - identifica horários, dias da semana e períodos com maior risco
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "pct_delayed >= 0 AND pct_delayed <= 100"
     columns:
       - name: event_date
         description: Data do evento
@@ -263,9 +264,6 @@ models:
         description: Desvio padrão dos atrasos no período
       - name: pct_delayed
         description: Percentual de atrasos no período
-        tests:
-          - dbt_utils.expression_is_true:
-              expression: "pct_delayed >= 0 AND pct_delayed <= 100"
       - name: avg_weight_kg
         description: Peso médio no período
       - name: heavy_shipments_count
@@ -309,6 +307,15 @@ models:
 
   - name: risk_forecast_features
     description: Tabela de features para forecasting de atrasos - dados agregados diariamente por rota-veículo-período, com features de lag e tendência
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "delay_rate_pct >= 0 AND delay_rate_pct <= 100"
+      - dbt_utils.expression_is_true:
+          expression: "heavy_shipment_pct >= 0 AND heavy_shipment_pct <= 100"
+      - dbt_utils.expression_is_true:
+          expression: "route_risk_score >= 0 AND route_risk_score <= 100"
+      - dbt_utils.expression_is_true:
+          expression: "vehicle_risk_score >= 0 AND vehicle_risk_score <= 100"
     columns:
       - name: event_date
         description: Data do agregação
@@ -348,23 +355,14 @@ models:
         description: Terceiro quartil dos atrasos
       - name: delay_rate_pct
         description: Taxa de atraso percentual
-        tests:
-          - dbt_utils.expression_is_true:
-              expression: "delay_rate_pct >= 0 AND delay_rate_pct <= 100"
       - name: heavy_shipment_pct
         description: Percentual de remessas pesadas
-        tests:
-          - dbt_utils.expression_is_true:
-              expression: "heavy_shipment_pct >= 0 AND heavy_shipment_pct <= 100"
       - name: most_common_delay_category
         description: Categoria de atraso mais comum no dia
       - name: most_common_vehicle_type
         description: Tipo de veículo mais comum no dia
       - name: route_risk_score
         description: Score de risco da rota (do modelo risk_route_analysis)
-        tests:
-          - dbt_utils.expression_is_true:
-              expression: "route_risk_score >= 0 AND route_risk_score <= 100"
       - name: route_risk_category
         description: Categoria de risco da rota
         tests:
@@ -372,9 +370,6 @@ models:
               values: ['HIGH', 'MEDIUM', 'LOW']
       - name: vehicle_risk_score
         description: Score de risco do veículo (do modelo risk_vehicle_analysis)
-        tests:
-          - dbt_utils.expression_is_true:
-              expression: "vehicle_risk_score >= 0 AND vehicle_risk_score <= 100"
       - name: vehicle_risk_category
         description: Categoria de risco do veículo
         tests:
