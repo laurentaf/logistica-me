@@ -68,10 +68,10 @@ SELECT
   column_name,
   null_count,
   total_count,
-  ROUND((null_count::float / total_count) * 100, 2) as null_percentage,
-  CASE 
+  ROUND(((null_count::numeric) / NULLIF(total_count, 0)) * 100, 2) as null_percentage,
+  CASE
     WHEN total_count = 0 THEN 'PASS'
-    WHEN (null_count::float / total_count) > 0.05 THEN 'FAIL'  -- >5% null rate
+    WHEN ((null_count::numeric) / NULLIF(total_count, 0)) > 0.05 THEN 'FAIL'
     ELSE 'PASS'
   END as test_status
 FROM column_null_counts

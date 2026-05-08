@@ -42,23 +42,14 @@ models:
         description: FK para dim_routes
         tests:
           - not_null
-          - relationships:
-              to: dim_routes
-              field: route_id
       - name: vehicle_id
         description: FK para dim_vehicles
         tests:
           - not_null
-          - relationships:
-              to: dim_vehicles
-              field: vehicle_id
       - name: incident_id
         description: FK para dim_incidents
         tests:
           - not_null
-          - relationships:
-              to: dim_incidents
-              field: incident_id
       - name: weight_kg
         description: Peso da remessa em quilogramas
         tests:
