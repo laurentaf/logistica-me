@@ -6,43 +6,40 @@ import subprocess
 import json
 import sys
 from datetime import datetime
+from dotenv import load_dotenv
 from pathlib import Path
 
-project_id = "b3884914-82a8-45c9-9c56-f37e87f45077"
-url = f"https://api.datamission.com.br/projects/{project_id}/dataset?format=csv"
+load_dotenv()
 
-# Load API token from .env file
+
+def load_project_id():
+    project_id = os.getenv("PROJECT_ID")
+    if not project_id:
+        raise ValueError("PROJECT_ID not found in .env file")
+    return project_id
+
+
 def load_api_token():
-    """Load API token from .env file."""
-    try:
-        with open('.env', 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith('API_KEY_DATASET='):
-                    # Remove quotes if present
-                    token = line.split('=', 1)[1].strip()
-                    if token.startswith('"') and token.endswith('"'):
-                        token = token[1:-1]
-                    elif token.startswith("'") and token.endswith("'"):
-                        token = token[1:-1]
-                    return token
-    except FileNotFoundError:
-        pass
-    return None
+    """Load API token from environment."""
+    token = os.getenv("API_KEY_DATASET")
+    if token:
+        token = token.strip().strip('"').strip("'")
+    return token
 
-def get_next_sequence(start=None):
+
+def get_next_sequence(project_id, start=None):
     """Get next sequence number. If start provided, use it. Otherwise auto-detect from existing files."""
     if start is not None:
         return int(start)
-    
+
     # Auto-detect: find highest existing sequence number and add 1
     raw_dir = Path("data/raw")
     if not raw_dir.exists():
         return 1
-    
+
     pattern = f"dataset_{project_id}_*.csv"
     existing_files = list(raw_dir.glob(pattern))
-    
+
     max_seq = 0
     for file in existing_files:
         try:
@@ -53,13 +50,13 @@ def get_next_sequence(start=None):
                 max_seq = seq_num
         except (ValueError, IndexError):
             continue
-    
+
     return max_seq + 1
 
 def run_data_test(csv_file):
     """Run data consistency test on downloaded CSV file."""
     print(f"\n🧪 Running data quality test for {csv_file}...")
-    
+
 # Create a simple test script for this specific file
     test_script = f"""
 import csv
@@ -89,13 +86,13 @@ if os.path.exists(csv_file):
         with open(csv_file, 'r', encoding='utf-8') as f:
             reader = csv.reader(f)
             headers = next(reader)
-            
+
             test_results["tests"].append({{
                 "name": "readable_csv",
                 "description": "CSV file can be read successfully",
                 "status": "PASS"
             }})
-            
+
             # Test 3: Column count
             expected_columns = 8
             actual_columns = len(headers)
@@ -106,11 +103,11 @@ if os.path.exists(csv_file):
                 "expected": expected_columns,
                 "actual": actual_columns
             }})
-            
+
             # Test 4: Column names
             expected_columns_list = ['shipment_id', 'timestamp', 'origin', 'destination', 'weight_kg', 'delivery_status', 'vehicle_type', 'estimated_delay_minutes']
             column_match = headers == expected_columns_list
-            
+
             test_results["tests"].append({{
                 "name": "column_names",
                 "description": f"Column names match expected format",
@@ -118,19 +115,19 @@ if os.path.exists(csv_file):
                 "expected": expected_columns_list,
                 "actual": headers
             }})
-            
+
             # Test 5: Sample data row count
             data_rows = 0
             for row in reader:
                 data_rows += 1
-            
+
             test_results["tests"].append({{
                 "name": "data_row_count",
                 "description": f"Data rows (excluding header): {{data_rows}}",
                 "status": "PASS" if data_rows > 0 else "FAIL",
                 "actual": data_rows
             }})
-            
+
             # Store column information with data types
             column_info = []
             descriptions = {{
@@ -160,9 +157,9 @@ if os.path.exists(csv_file):
                     "expected_type": data_type,
                     "description": descriptions.get(header, "")
                 }})
-            
+
             test_results["columns"] = column_info
-            
+
     except Exception as e:
         test_results["tests"].append({{
             "name": "csv_read_error",
@@ -199,7 +196,7 @@ for test in test_results["tests"]:
 
 print(f"\\n📊 COLUMN DATATYPES:")
 for col in test_results["columns"]:
-    print(f"  {{col['position']}}. {{col['name']}} ({{col['expected_type']}}): {{col['description']}}")
+    print(f" {{col['position']}}. {{col['name']}} ({{col['expected_type']}}): {{col['description']}}")
 
 print(f"\\n📈 CONFORMITY: {{conformity_pct:.1f}}%")
 """
@@ -213,42 +210,42 @@ print(f"\\n📈 CONFORMITY: {{conformity_pct:.1f}}%")
             check=True
         )
         print(result.stdout)
-        
+
         # Parse the JSON results file
         results_file = csv_file.replace('.csv', '_test_results.json')
         if os.path.exists(results_file):
             with open(results_file, 'r') as f:
                 results = json.load(f)
-                return results
+            return results
     except subprocess.CalledProcessError as e:
         print(f"Test execution failed: {e}")
         print(f"Stderr: {e.stderr}")
     except Exception as e:
         print(f"Error running test: {e}")
-    
+
     return None
 
 def log_conformity_summary(test_results_list):
     """Log conformity summary across all files."""
     print(f"\n📊 OVERALL CONFORMITY SUMMARY")
     print("=" * 50)
-    
+
     total_passed = 0
     total_tests = 0
-    
+
     for results in test_results_list:
         if results and "summary" in results:
             summary = results["summary"]
             total_passed += summary["passed_tests"]
             total_tests += summary["total_tests"]
-            
+
             print(f"{results['file_name']}: {summary['conformity_percentage']}% "
                   f"({summary['passed_tests']}/{summary['total_tests']})")
-    
+
     if total_tests > 0:
         overall_pct = (total_passed / total_tests * 100)
         print(f"\n📈 OVERALL: {overall_pct:.1f}% ({total_passed}/{total_tests} tests passed)")
-        
+
         # Save overall summary
         summary_data = {
             "timestamp": datetime.now().isoformat(),
@@ -262,10 +259,10 @@ def log_conformity_summary(test_results_list):
                 "conformity": r["summary"]["conformity_percentage"] if r and "summary" in r else 0
             } for r in test_results_list if r]
         }
-        
+
         with open('download_conformity_summary.json', 'w') as f:
             json.dump(summary_data, f, indent=2)
-        
+
         print(f"\n📄 Summary saved to: download_conformity_summary.json")
 
 if __name__ == "__main__":
@@ -278,11 +275,14 @@ if __name__ == "__main__":
     if not token:
         raise ValueError("API_KEY_DATASET not found in .env file")
 
+    project_id = load_project_id()
+    url = f"https://api.datamission.com.br/projects/{project_id}/dataset?format=csv"
+
     headers = {"Authorization": f"Bearer {token}"}
 
     test_results = []
 
-    start_seq = get_next_sequence(args.start)
+    start_seq = get_next_sequence(project_id, args.start)
     print(f"📥 Starting download from sequence {start_seq:05d} ({args.count} files)")
 
     for i in range(start_seq, start_seq + args.count):
@@ -291,7 +291,7 @@ if __name__ == "__main__":
 
         # Ensure data/raw directory exists
         os.makedirs("data/raw", exist_ok=True)
-        
+
         filename = f"dataset_{project_id}_{i:05d}.csv"
         filepath = os.path.join("data/raw", filename)
         with open(filepath, "wb") as file:
@@ -308,7 +308,7 @@ if __name__ == "__main__":
                 column_count = len(csv_headers)
                 row_count = sum(1 for _ in reader)
         except Exception:
-            pass  # If reading fails, keep counts zero; test will catch it
+            pass # If reading fails, keep counts zero; test will catch it
 
         metadata = {
             "filename": filename,
@@ -326,7 +326,7 @@ if __name__ == "__main__":
             json.dump(metadata, f, indent=2)
 
         print(f"✅ Download {i-start_seq+1}/{args.count} concluído: {filepath} ({row_count} rows)")
-        
+
         # Run test immediately after download
         test_result = run_data_test(filepath)
         if test_result:

@@ -17,3 +17,29 @@ config.yml
 config.json
 .secrets
 config/seed_state.json
+
+# Python
+__pycache__/
+*.pyc
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Generated data (reproducible via API.py + pipeline)
+data/raw/
+data/processed/
+
+# Generated files
+download_conformity_summary.json
+pipeline_test.log
+
+# AI assistant local config
+.claude/
+
+# dbt local/generated files
+logistica_dbt/profiles.yml
+logistica_dbt/.user.yml
+logistica_dbt/package-lock.yml
+logistica_dbt/seeds/shipments_*.csv
