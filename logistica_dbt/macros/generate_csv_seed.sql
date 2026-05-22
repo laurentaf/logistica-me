@@ -1,29 +1,19 @@
 {% macro generate_csv_seed() %}
-  {# 
-    Macro to generate dbt seed commands for CSV files.
-    Usage: dbt run-operation generate_csv_seed
+  {#
+  Macro to list all shipment seed commands.
+  Usage: dbt run-operation generate_csv_seed
   #}
-  
-  {% set csv_files = [] %}
-  
-  {# Scan for CSV files with project ID pattern #}
-  {% set project_id = "b3884914-82a8-45c9-9c56-f37e87f45077" %}
-  {% set files_query = "SELECT name FROM stv_tbl_perm WHERE name LIKE 'dataset_" ~ project_id ~ "_%'" %}
-  
-  {# Create seed commands #}
-  {% for i in range(1, 100) %}
-    {% set seq_num = "%05d"|format(i) %}
-    {% set csv_file = "dataset_" ~ project_id ~ "_" ~ seq_num ~ ".csv" %}
-    {% set seed_name = "raw_logs_" ~ seq_num %}
-    
-    {% set seed_command = "dbt seed --select " ~ seed_name %}
-    {% do csv_files.append(seed_command) %}
+
+  {% set shipment_seeds = [] %}
+  {% for node in graph["nodes"].values() %}
+    {% if node.resource_type == "seed" and node.name.startswith("shipments_") %}
+      {% do shipment_seeds.append(node.name) %}
+    {% endif %}
   {% endfor %}
-  
-  {# Print commands #}
-  {% for command in csv_files %}
-    {{ log(command, info=true) }}
+
+  {% for seed_name in shipment_seeds %}
+    {{ log("dbt seed --select " ~ seed_name, info=true) }}
   {% endfor %}
-  
-  {{ return(csv_files) }}
+
+  {{ return(shipment_seeds) }}
 {% endmacro %}
