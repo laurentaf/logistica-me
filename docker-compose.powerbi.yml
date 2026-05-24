@@ -36,6 +36,7 @@ services:
       API_KEY_DATASET: ${API_KEY_DATASET}
       API_KEY_NVIDIA: ${API_KEY_NVIDIA}
       API_KEY_OPENROUTER: ${API_KEY_OPENROUTER}
+      PROJECT_ID: ${PROJECT_ID}
     volumes:
       - ./data:/app/data
       - ./config:/app/config
