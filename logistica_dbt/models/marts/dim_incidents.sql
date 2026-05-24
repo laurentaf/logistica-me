@@ -3,7 +3,6 @@
 WITH incident_sources AS (
     SELECT DISTINCT
         delivery_status,
-        estimated_delay_minutes,
         CASE
             WHEN estimated_delay_minutes <= 0 THEN 'ON_TIME'
             WHEN estimated_delay_minutes <= 30 THEN 'MINOR_DELAY'

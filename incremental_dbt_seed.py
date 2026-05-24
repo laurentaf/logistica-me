@@ -1,230 +1,101 @@
 #!/usr/bin/env python3
 """
 Incremental dbt seed for PostgreSQL.
-Only loads new files that haven't been processed yet.
-After seeding, automatically runs dbt models so downstream
-tables (stg_shipments, fact_shipments, risk_*) pick up new data.
+Concatenates all processed CSVs into a single shipments.csv seed,
+then loads it via dbt seed --full-refresh and runs dbt models.
 """
-
-import os
-import json
+import os, sys, json, csv, subprocess
 from pathlib import Path
-import subprocess
 from datetime import datetime
 
-class IncrementalDBTSeed:
-    def __init__(self):
-        self.state_file = "config/seed_state.json"
-        self.seeds_dir = "logistica_dbt/seeds"
-        self.processed_dir = "data/processed"
-        self.raw_dir = "data/raw"
+SEED_FILE = "logistica_dbt/seeds/shipments.csv"
+SEED_STATE = "config/seed_state.json"
+PROCESSED_DIR = "data/processed"
+DBT_DIR = "logistica_dbt"
 
-        # Initialize state file if it doesn't exist
-        self.ensure_state_file()
 
-    def ensure_state_file(self):
-        """Ensure state file exists."""
-        # Ensure the directory for the state file exists
-        state_dir = os.path.dirname(self.state_file)
-        if state_dir:
-            os.makedirs(state_dir, exist_ok=True)
+def load_state():
+    try:
+        with open(SEED_STATE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"last_run": None, "processed_files": [], "total_rows_loaded": 0}
 
-        if not os.path.exists(self.state_file):
-            state = {
-                "last_run": None,
-                "processed_files": [],
-                "loaded_files": [],
-                "total_rows_loaded": 0
-            }
-            self.save_state(state)
 
-    def load_state(self):
-        """Load current state."""
-        try:
-            with open(self.state_file, 'r') as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return {
-                "last_run": None,
-                "processed_files": [],
-                "loaded_files": [],
-                "total_rows_loaded": 0
-            }
+def save_state(state):
+    state["last_run"] = datetime.now().isoformat()
+    os.makedirs(os.path.dirname(SEED_STATE), exist_ok=True)
+    with open(SEED_STATE, "w") as f:
+        json.dump(state, f, indent=2)
 
-    def save_state(self, state):
-        """Save state to file."""
-        state["last_run"] = datetime.now().isoformat()
-        with open(self.state_file, 'w') as f:
-            json.dump(state, f, indent=2)
 
-    def count_rows_in_csv(self, csv_file):
-        """Count rows in CSV file (excluding header)."""
-        try:
-            with open(csv_file, 'r', encoding='utf-8') as f:
-                return sum(1 for line in f) - 1  # Subtract header
-        except Exception:
-            return 0
+def build_single_seed():
+    all_processed = sorted(Path(PROCESSED_DIR).glob("*_processed.csv"))
+    if not all_processed:
+        print("No processed files found")
+        return 0
 
-    def get_new_processed_files(self, state):
-        """Get processed files that haven't been loaded yet."""
-        processed_files = list(Path(self.processed_dir).glob("*_processed.csv"))
+    header, total = None, 0
+    with open(SEED_FILE, "w", newline="", encoding="utf-8") as out:
+        w = csv.writer(out)
+        for fp in all_processed:
+            with open(fp, newline="", encoding="utf-8") as f:
+                r = csv.reader(f)
+                h = next(r)
+                if header is None:
+                    header = h
+                    w.writerow(header)
+                for row in r:
+                    w.writerow(row)
+                    total += 1
+    print(f"Built shipments.csv: {total} rows from {len(all_processed)} files")
+    return total
 
-        new_files = []
-        for file_path in processed_files:
-            file_str = str(file_path)
-            if file_str not in state["processed_files"]:
-                new_files.append(file_str)
 
-        return new_files
+def run_dbt(*args):
+    from dotenv import load_dotenv
+    load_dotenv(".env")
+    env = os.environ.copy()
+    for k in ("POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_USERNAME",
+              "POSTGRES_PASSWORD", "POSTGRES_DBNAME"):
+        env[k] = os.getenv(k, "")
 
-    def prepare_seed_from_processed(self, processed_file):
-        """Prepare seed file from processed file."""
-        processed_path = Path(processed_file)
+    dbt = str(Path(".venv-dbt/Scripts/dbt.exe") if Path(".venv-dbt/Scripts/dbt.exe").exists() else "dbt")
+    cmd = [dbt] + list(args) + ["--profiles-dir", "."]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=600, env=env, cwd=DBT_DIR)
+    for line in (r.stdout + r.stderr).splitlines():
+        if any(s in line for s in ("PASS", "FAIL", "ERROR", "Completed",
+                                    "Finished", "Done.", "OK created")):
+            print(line.strip())
+    return r.returncode == 0
 
-        # Extract sequence number from filename:
-        # Example: dataset_b3884914-82a8-45c9-9c56-f37e87f45077_00001_processed.csv
-        stem = processed_path.stem
-        # Remove trailing "_processed" if present
-        if stem.endswith('_processed'):
-            stem = stem[:-10]  # remove "_processed" (10 chars)
-        # Now stem: dataset_b3884914-..._00001
-        # Get last part after final underscore
-        seq = stem.rsplit('_', 1)[-1]
-        if not seq.isdigit():
-            raise ValueError(f"Could not extract sequence from filename: {processed_path.name}")
-
-        seed_name = f"shipments_{seq}"
-        seed_filename = f"{seed_name}.csv"
-        seed_path = Path(self.seeds_dir) / seed_filename
-
-        # Copy processed file to seeds directory with new name
-        import shutil
-        shutil.copy2(processed_file, seed_path)
-
-        return str(seed_path), seed_name
-
-    def _run_dbt_command(self, *args):
-        """Run a dbt subcommand inside logistica_dbt/ and return success."""
-        original_dir = os.getcwd()
-        try:
-            os.chdir("logistica_dbt")
-            cmd = ["dbt"] + list(args) + ["--profiles-dir", "."]
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode == 0:
-                if result.stdout:
-                    print(result.stdout[:500])
-                return True
-            else:
-                print("STDOUT:", result.stdout)
-                print("STDERR:", result.stderr)
-                return False
-        except Exception as e:
-            print(f"❌ Error: {e}")
-            return False
-        finally:
-            os.chdir(original_dir)
-
-    def run_dbt_seed_and_models(self, seed_names):
-        """Seed new files, then run all models so downstream tables refresh."""
-        if not seed_names:
-            print("⚠️  No new seeds to load")
-            return True
-
-        print(f"🌱 Running dbt seed for {len(seed_names)} new seed(s): {', '.join(seed_names)}")
-        if not self._run_dbt_command("seed", "--select", *seed_names):
-            print("❌ dbt seed failed")
-            return False
-        print("✅ dbt seed completed successfully")
-
-        print("🔄 Running dbt run to refresh downstream models (stg_shipments → marts → risk)...")
-        if not self._run_dbt_command("run"):
-            print("❌ dbt run failed")
-            return False
-        print("✅ dbt run completed successfully")
-
-        print("🧪 Running dbt test to validate data quality...")
-        test_ok = self._run_dbt_command("test")
-        if test_ok:
-            print("✅ All dbt tests passed")
-        else:
-            print("⚠️  Some dbt tests failed — review data quality")
-
-        return True
-
-    def run_incremental_pipeline(self):
-        """Run complete incremental pipeline."""
-        print("=" * 60)
-        print("🌱 INCREMENTAL DBT SEED PIPELINE")
-        print("=" * 60)
-
-        # Load current state
-        state = self.load_state()
-
-        # Check for new processed files
-        new_processed_files = self.get_new_processed_files(state)
-
-        if not new_processed_files:
-            print("✅ No new processed files to load")
-            print(f"Last run: {state.get('last_run', 'Never')}")
-            print(f"Total files loaded: {len(state['loaded_files'])}")
-            print(f"Total rows loaded: {state['total_rows_loaded']}")
-            return
-
-        print(f"📁 Found {len(new_processed_files)} new processed files")
-
-        # Prepare seeds and update state
-        seed_paths_prepared = []
-        seed_names = []
-        total_new_rows = 0
-
-        for processed_file in new_processed_files:
-            try:
-                seed_path, seed_name = self.prepare_seed_from_processed(processed_file)
-                row_count = self.count_rows_in_csv(seed_path)
-
-                seed_paths_prepared.append(seed_path)
-                seed_names.append(seed_name)
-                state["processed_files"].append(processed_file)
-                state["loaded_files"].append({
-                    "file": seed_name,
-                    "processed_source": processed_file,
-                    "rows": row_count,
-                    "loaded_at": datetime.now().isoformat()
-                })
-                state["total_rows_loaded"] += row_count
-
-                print(f"✅ Prepared: {seed_name} ({row_count} rows)")
-                total_new_rows += row_count
-
-            except Exception as e:
-                print(f"❌ Error preparing {processed_file}: {e}")
-
-        # Run dbt seed + run + test for the new seeds
-        if seed_names:
-            success = self.run_dbt_seed_and_models(seed_names)
-
-            if success:
-                # Update state
-                self.save_state(state)
-
-                print("\n" + "=" * 60)
-                print("🎉 INCREMENTAL LOAD COMPLETED")
-                print("=" * 60)
-                print(f"📊 Summary:")
-                print(f"  New files loaded: {len(seed_names)}")
-                print(f"  Total rows added: {total_new_rows}")
-                print(f"  Total files in database: {len(state['loaded_files'])}")
-                print(f"  Total rows in database: {state['total_rows_loaded']}")
-                print(f"\n📈 Next incremental run will only process new files")
-            else:
-                print("❌ Incremental load failed - state not updated")
-        else:
-            print("⚠️  No seed files were successfully prepared")
 
 def main():
-    """Main function."""
-    pipeline = IncrementalDBTSeed()
-    pipeline.run_incremental_pipeline()
+    state = load_state()
+    new_files = [str(f) for f in sorted(Path(PROCESSED_DIR).glob("*_processed.csv"))
+                 if str(f) not in state["processed_files"]]
+
+    if not new_files:
+        print(f"No new files. Last run: {state.get('last_run', 'Never')}")
+        return
+
+    print(f"Found {len(new_files)} new file(s)")
+    total_rows = build_single_seed()
+
+    print("Seeding shipments to PostgreSQL...")
+    if not run_dbt("seed", "--select", "shipments", "--full-refresh"):
+        print("dbt seed failed"); return
+
+    for f in new_files:
+        state["processed_files"].append(f)
+    state["total_rows_loaded"] += total_rows
+    save_state(state)
+
+    print("Running dbt models...")
+    run_dbt("run")
+    print("Running dbt tests...")
+    run_dbt("test")
+
 
 if __name__ == "__main__":
     main()

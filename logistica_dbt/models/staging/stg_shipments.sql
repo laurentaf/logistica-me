@@ -9,6 +9,4 @@ SELECT
   delivery_status,
   vehicle_type,
   estimated_delay_minutes::integer AS estimated_delay_minutes
-FROM (
-  {{ union_shipment_seeds() }}
-) AS all_shipments
+FROM {{ ref('shipments') }}

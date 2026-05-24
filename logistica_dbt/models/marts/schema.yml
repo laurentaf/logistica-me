@@ -1,25 +1,6 @@
 version: 2
 
 models:
-  # SEED: Test Registry
-  - name: test_registry
-    description: Registro de todos os testes de qualidade de dados com metadados (tipo, fase, ferramenta, métrica)
-    columns:
-      - name: test_name
-        description: Nome único do teste
-      - name: test_type
-        description: Tipo de teste (completeness, uniqueness, validity, accuracy, timeliness, etc.)
-      - name: phase
-        description: Fase do pipeline (staging, marts, dimension)
-      - name: tool
-        description: Ferramenta utilizada (dbt, custom, etc.)
-      - name: metric
-        description: Métrica ou coluna que o teste valida
-      - name: description
-        description: Descrição do que o teste verifica
-      - name: model_name
-        description: Modelo ao qual o teste pertence
-
   # CORE FACT & DIMENSIONS
   - name: fact_shipments
     description: Tabela fato de remessas logísticas com métricas de atraso e dimensões de rotas, veículos e incidentes

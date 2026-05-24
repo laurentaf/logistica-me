@@ -1,6 +1,26 @@
 version: 2
 
 seeds:
+  - name: shipments
+    description: Dados brutos de remessas logísticas concatenados de todos os arquivos processados. Contém shipment_id, timestamp, origem, destino, peso, status, tipo de veículo e atraso estimado.
+    columns:
+      - name: shipment_id
+        description: Identificador único da remessa
+      - name: timestamp
+        description: Data/hora do evento no formato ISO 8601
+      - name: origin
+        description: Local de origem da remessa
+      - name: destination
+        description: Local de destino da remessa
+      - name: weight_kg
+        description: Peso da remessa em quilogramas
+      - name: delivery_status
+        description: "Status da entrega (ex: IN_TRANSIT, DELIVERED)"
+      - name: vehicle_type
+        description: Tipo de veículo utilizado
+      - name: estimated_delay_minutes
+        description: Atraso estimado em minutos
+
   - name: test_registry
     description: Catálogo de todos os testes de qualidade de dados implementados no projeto. Contém metadados como tipo, fase, ferramenta e métrica de cada teste.
     columns:

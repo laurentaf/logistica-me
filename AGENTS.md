@@ -21,14 +21,14 @@ This file contains production secrets. Use `.env.example` exclusively to underst
 
 ### Flow
 ```
-API → data/raw/ → (metadata + quality tests) → data/processed/ → dbt seed → PostgreSQL → dbt models → Power BI
+API → data/raw/ → (metadata + quality tests) → data/processed/ → (concat into single CSV) → dbt seed → PostgreSQL → dbt models → Power BI
 ```
 
 ### Stages
 1. **API Download** (`API.py`): Fetch CSV from DataMission API → `data/raw/`
 2. **Quality Testing** (part of API.py): Generate metadata JSON + test_results JSON per file
 3. **Processing** (`data_processing_pipeline.py`): Clean, normalize, validate → `data/processed/`
-4. **Incremental Seed** (`incremental_dbt_seed.py`): Copy to `logistica_dbt/seeds/` + track state
+4. **Incremental Seed** (`incremental_dbt_seed.py`): Concat to `logistica_dbt/seeds/shipments.csv` + track state
 5. **dbt Transform** ([`logistica_dbt/`](logistica_dbt/README.md)): Staging → Dimensions + Facts + Risk Models
 6. **Quality Validation** (`dbt test`): 70+ tests across all models
 7. **Power BI**: Direct PostgreSQL connection to final tables
@@ -36,7 +36,7 @@ API → data/raw/ → (metadata + quality tests) → data/processed/ → dbt see
 ### Key Directories
 - `data/raw/`: Original API downloads with metadata + test results
 - `data/processed/`: Cleaned CSVs + cleaning_report JSONs
-- `logistica_dbt/seeds/`: CSVs ready for dbt seed (renamed to `shipments_XXXXX.csv`)
+- `logistica_dbt/seeds/`: CSVs ready for dbt seed — single `shipments.csv` (concatenated from all processed files)
 - `config/`: Local config (NOT committed), tracks seed state in `seed_state.json`
 - `logistica_dbt/models/`: All dbt transformations
   - `staging/`: `stg_shipments.sql` - basic cleaning and type casting
@@ -97,20 +97,20 @@ python incremental_dbt_seed.py
 cd logistica_dbt
 
 # Install dependencies (dbt_utils)
-dbt deps --profiles-dir ..
+dbt deps --profiles-dir .
 
 # Load seeds (if any new files)
-dbt seed --profiles-dir ..
+dbt seed --profiles-dir .
 
 # Run all models (staging → marts → risk)
-dbt run --profiles-dir ..
+dbt run --profiles-dir .
 
 # Run all tests
-dbt test --profiles-dir ..
+dbt test --profiles-dir .
 
 # Run specific tags
-dbt run --profiles-dir .. --select tag:staging
-dbt test --profiles-dir .. --select tag:staging
+dbt run --profiles-dir . --select tag:staging
+dbt test --profiles-dir . --select tag:staging
 ```
 
 #### Test Pipeline Health
@@ -132,7 +132,7 @@ psql -h $POSTGRES_HOST -U $POSTGRES_USERNAME -d $POSTGRES_DBNAME \
 python API.py && \
 python data_processing_pipeline.py && \
 python incremental_dbt_seed.py && \
-cd logistica_dbt && dbt run --profiles-dir .. && dbt test --profiles-dir ..
+cd logistica_dbt && dbt run --profiles-dir . && dbt test --profiles-dir .
 ```
 
 ## dbt Model Architecture
@@ -154,7 +154,7 @@ fact_shipments → all risk models
 ### Core Models
 
 #### Seeds (raw data)
-- `shipments_00001.csv` .. `shipments_00036.csv`: Processed CSV files
+- `shipments.csv`: All processed CSV files concatenated
 - `test_registry.csv`: Test metadata catalog
 
 #### Staging
@@ -220,7 +220,7 @@ All tests are catalogued in PostgreSQL table `public.test_registry` (loaded via 
 - `fact_*`: Fact tables
 - `risk_*`: Risk analysis models
 - Custom tests: Descriptive snake_case (`valid_timestamp_format`)
-- Seeds: `shipments_XXXXX.csv` (sequential numbers, padded to 5 digits)
+- Seeds: `shipments.csv` (single concatenated seed from all processed files)
 
 ### Column Names
 - Primary keys: `{table_name}_id`
@@ -244,7 +244,8 @@ All tests are catalogued in PostgreSQL table `public.test_registry` (loaded via 
 ### Incremental Seed Pattern
 - State tracked in `config/seed_state.json` (DO NOT commit)
 - Only processes NEW files since last run
-- Renames CSV to `shipments_XXXXX.csv` for consistent seed naming
+- Concatenates ALL processed CSVs into a single `shipments.csv` seed (one seed only — no multiple numbered seeds)
+- Uses `dbt seed --full-refresh` to overwrite the table with fresh data each time
 - Prevents re-processing and duplicate data
 
 ### API Rate Limiting & Sequences
