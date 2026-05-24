@@ -235,7 +235,9 @@ API (download) → data/raw → Limpeza → data/processed → dbt seed → Post
 | `incremental_dbt_seed.py` | Carga incremental no PostgreSQL via dbt seed | `python incremental_dbt_seed.py` |
 | `test_e2e_pipeline.py` | Teste completo do pipeline end-to-end | `python test_e2e_pipeline.py` |
 | `preview_models.py` | Visualização dos schemas dos modelos dbt | `python preview_models.py` |
-| `install_dbt.py` | Instalação do dbt-core + dbt-postgres + dbt_utils | `python install_dbt.py` |
+| `install_dbt.py` | Instalação do dbt-core + dbt-postgres | `python install_dbt.py` |
+| `export_powerbi_dataset.py` | Exporta dataset Power BI do PostgreSQL para CSV | `python export_powerbi_dataset.py` |
+| `docker-compose.powerbi.yml` | Pipeline automatizado via Docker (API → dbt → CSV) | `docker-compose -f docker-compose.powerbi.yml up` |
 
 #### Detalhamento dos Scripts
 
@@ -359,7 +361,31 @@ python incremental_dbt_seed.py
 - **Renomeia seeds** para `raw_logs_{seq}.csv` automaticamente
 - **Executa dbt seed** apenas para seeds novas
 
-### 6. Previsão de Risco e Análise de Drivers de Atraso
+### 6. Dataset para Power BI
+
+#### Exportar Dataset Final
+```bash
+python export_powerbi_dataset.py
+```
+Gera um CSV denormalizado em `data/powerbi/` com:
+- `logistica_me_dataset_*.csv`: fact_shipments + dimensões (routes, vehicles, incidents)
+- `risk_route_analysis_*.csv`, `risk_vehicle_analysis_*.csv`, etc.: tabelas de risco
+
+#### Opções de Conexão Power BI
+1. **DirectQuery (recomendado)**: Conecte diretamente ao PostgreSQL
+2. **CSV Exportado**: Importe o CSV gerado por `export_powerbi_dataset.py`
+3. **Docker Automatizado**: `docker-compose -f docker-compose.powerbi.yml up`
+
+### 7. Dashboard no Power BI
+
+Consulte `dashboard/POWERBI_DASHBOARD.md` para:
+- KPIs críticos (taxa de atraso, atraso médio, score de risco)
+- Layout sugerido (4 páginas: Visão Geral, Risco, Temporal, Forecasting)
+- Medidas DAX recomendadas
+- Formatação condicional
+- Star Schema do modelo
+
+### 8. Previsão de Risco e Análise de Drivers de Atraso
 
 O projeto inclui uma série de modelos analíticos para identificar os principais fatores que contribuem para atrasos nas entregas:
 

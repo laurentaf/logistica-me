@@ -43,3 +43,7 @@ logistica_dbt/profiles.yml
 logistica_dbt/.user.yml
 logistica_dbt/package-lock.yml
 logistica_dbt/seeds/shipments_*.csv
+logistica_dbt/seeds/shipments.csv
+
+# Power BI exports (reproducible via export_powerbi_dataset.py)
+data/powerbi/

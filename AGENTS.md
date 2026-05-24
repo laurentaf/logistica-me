@@ -124,7 +124,15 @@ python preview_models.py
 # View all test results in database (requires connection)
 psql -h $POSTGRES_HOST -U $POSTGRES_USERNAME -d $POSTGRES_DBNAME \
   -c "SELECT * FROM public.test_registry ORDER BY test_type, model_name;"
+
+# Export Power BI dataset
+python export_powerbi_dataset.py
 ```
+
+#### Dashboard
+- `dashboard/POWERBI_DASHBOARD.md`: Dashboard mockups, KPIs, DAX measures, star schema
+- `export_powerbi_dataset.py`: Exports denormalized CSV from PostgreSQL for Power BI
+- `docker-compose.powerbi.yml`: Automated pipeline (API → dbt → CSV export) via Docker
 
 #### Daily Operations (Complete Incremental)
 ```bash

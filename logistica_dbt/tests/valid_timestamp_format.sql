@@ -1,6 +1,5 @@
 {{ config(tags=['data_quality']) }}
 
 SELECT *
-FROM {{ ref('stg_shipments') }}
-WHERE event_timestamp IS NOT NULL 
-  AND event_timestamp::timestamp IS NULL
+FROM {{ ref('shipments') }}
+WHERE timestamp IS NULL

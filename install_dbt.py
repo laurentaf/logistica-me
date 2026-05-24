@@ -38,9 +38,8 @@ def main():
         print("Try manually: .venv-dbt\\Scripts\\activate && pip install dbt-core dbt-postgres")
         sys.exit(1)
     
-    # Install dbt-utils package
-    print("\n3️⃣ Installing dbt-utils (project dependency)...")
-    subprocess.run([str(pip_path), "install", "dbt-utils==1.1.0"])
+    # dbt-utils is resolved via dbt deps (packages.yml) — not via pip
+    # See logistica_dbt/packages.yml for the correct version
     
     # Check installation
     print("\n4️⃣ Verifying installation...")
