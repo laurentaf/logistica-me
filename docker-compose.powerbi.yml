@@ -51,8 +51,5 @@ services:
         python export_powerbi_dataset.py &&
         echo '=== Pipeline complete. CSVs in data/powerbi/ ==='
       "
-    profiles:
-      - automated
-
 volumes:
   postgres-data:
